@@ -314,7 +314,7 @@ const DEFAULT_CATS=[
   {id:"lazer",n:"Lazer",ico:"🎉",c:"#fbbf24"},
   {id:"outros",n:"Outros",ico:"💡",c:"#7C5CBF"},
 ];
-const EMOJIS=["🏠","🛒","🚗","👦","👧","💊","💆","👗","⛽","🎒","✈️","🎉","💡","🍔","🍕","☕","🎮","📱","💻","🏋️","🐾","🐶","🌿","💈","🏥","🎓","📚","💼","💰","🎁","🛠️","🏖️","🎵","🚌","🚕","🛵","🧴","🧹","💧","⚡","🌐","📦","🧸","🏊","🎨","🍷","🧃","🛍️"];
+const EMOJIS=["🏠","🛒","🚗","👦","👧","💊","💆","👗","⛽","🎒","✈️","🎉","💡","🍔","🍕","☕","🎮","📱","💻","🏋️","🐾","🐶","🌿","💈","🏥","🎓","📚","💼","💰","🎁","🛠️","🏖️","🎵","🚌","🚕","🛵","🧴","🧹","💧","➡","🌐","📦","🧸","🏊","🎨","🍷","🧃","🛍️"];
 const COLORS=["#EF4444","#F97316","#F59E0B","#fbbf24","#10B981","#2dc76d","#06B6D4","#3B82F6","#6366F1","#8B5CF6","#EC4899","#e91e8c","#7C5CBF","#92400E","#059669","#0284C7"];
 const GRADS=[["#2dc76d","#00c9a7"],["#7b5ea7","#e91e8c"],["#f97316","#fbbf24"],["#3b82f6","#06b6d4"],["#ef4444","#f97316"],["#14b8a6","#3b82f6"]];
 
@@ -322,31 +322,28 @@ let UI={tab:"home",tipo:"gasto",catSel:"",mes:mesAtual()};
 let DB_txs={},DB_wallets={},DB_orcs={},DB_cats={};
 let CH={},meuNome=localStorage.getItem("sw_nome")||"Eu";
 let selEmoji="🏠",selColor=COLORS[0];
-
 function catsArr(){
-  const db=Object.entries(DB_cats).map(([k,v])=>({...v,_key:k}));
+  const db=Object.entries(DB_cats).map(([k,v])=>({...v,_key:k
+}));
   return db.length?db:DEFAULT_CATS;
 }
 function getCat(id){return catsArr().find(c=>c.id===id||c._key===id)||{n:"Outros",ico:"💡",c:"#7C5CBF"}}
-
 function mesAtual(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
 function hoje(){return new Date().toISOString().split("T")[0]}
-function fmt(v){return"R$ "+Math.abs(+v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:(2)})}
+function fmt(v){return"R$ "+Math.abs(+v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function fmtDate(d){return d?d.split("-").reverse().join("/"):""}
 function labelMes(m){if(!m)return"";const[a,mo]=m.split("-");return new Date(a,mo-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}
 function txsArr(){return Object.entries(DB_txs).map(([k,v])=>({...v,_key:k}))}
-function walletsArr(){
-//return Object.entries(DB_wallets).map(([k,v])=>({...v,_key:k}))}
+function walletsArr(){return Object.entries(DB_wallets).map(([k,v])=>({...v,_key:k}))}
 function orcsArr(){return Object.entries(DB_orcs).map(([k,v])=>({...v,_key:k}))}
 function txsMes(m){return txsArr().filter(t=>t.d&&t.d.startsWith(m||UI.mes))}
-function saldoW(w){return(+w.saldo||0)+txsArr().filter(t=>t.wid===w._key).reduce((s,t)=>s+(t.tipo==="receita"?+t.v:-(+t.v)),0)}
-function promptNome(){const n=prompt("Seu nome:",meuNome);if(n&&n.trim()){meuNome=n.trim();localStorage.setItem("sw_nome",meuNome);document.getElementById("tb-avatar").textContent=meuNome.slice(0,2).toUpperCase()}}
+function saldoW(w){return(+{.saldo||0)+txsArr().filter(t=>t.wid===w._key).reduce((s,t)=>s+(t.tipo==="receita"?+t.v:-(+t.v)),0)}
+function promptNome(){const n=prompt("Seu nome:",meuNome);if(n&&n.trim()){meuNome=n.trim();;localStorage.setItem("sw_nome",meuNome);document.getElementById("tb-avatar").textContent=meuNome.slice(0,2).toUpperCase()}}
 
 function initFirebase(){
   const db=window._db,ref=window._ref,onValue=window._onValue;
   const dot=document.getElementById("syncdot");
-  onValue(ref(db,"wallets"),snap=>{DB_wallets=snap.val()||{};if(!Object.keys(DB_wallets).length)window._push(ref(db,"wallets"),{nome:"Carteira Conjunta",saldo:0,gi:
-0});render()});
+  onValue(ref(db,"wallets"),snap=>{DB_wallets=snap.val()||{};if(!Object.keys(DB_wallets).length)window._push(ref(db,"wallets"),{nome:"Carteira Conjunta",saldo:0,gi:0});render()});
   onValue(ref(db,"txs"),snap=>{DB_txs=snap.val()||{};dot.className="sync-dot ok";render()},()=>{dot.className="sync-dot err"});
   onValue(ref(db,"orcs"),snap=>{DB_orcs=snap.val()||{};render()});
   onValue(ref(db,"cats"),snap=>{DB_cats=snap.val()||{};render()});
@@ -375,23 +372,16 @@ function render(){
 // ── HOME ──
 function renderHome(){
   const txs=txsMes(),rec=txs.filter(t=>t.tipo==="receita").reduce((s,t)=>s+(+t.v),0),gas=txs.filter(t=>t.tipo==="gasto").reduce((s,t)=>s+(+t.v),0),sal=rec-gas;
+  const wcards=walletsArr().map(w=>{const g=GRADS[w.gi%GRADS.length],wr=txsArr().filter(t=>t.wid===w._key&&t.tipo==="receita").reduce((s,t)=>s+(+t.v),0),wg=txsArr().filter(t=>t.wid===w._key&&t.tipo==="gasto").reduce((s,t)=>s+(+t.v),0);
+    return`<div class="wcard" style="background:linear-gradient(135deg,${g[0]},${g[1]})"><div class="wcard-glow"></div><div class="wcard-glow2"></div><div class="wcard-lbl">${w.nome}</div><div class="wcard-bal">${fmt(saldoW(w))}</div><div class="wcard-foot"><span>↑ ${fmt(wr)}</span><span>↓ ${fmt(wg)}</span></div></div>`;
+  }).join("");
   const recent=txsArr().sort((a,b)=>b._key.localeCompare(a._key)).slice(0,5);
   const txhtml=recent.length===0?`<div class="empty"><div class="empty-ico">💸</div><div class="empty-txt">Nenhuma transação ainda.<br>Toque <strong>+</strong> para adicionar!</div></div>`
-    :recent.map(t=>{cat=getCat(t.tipo==="gasto"?t.cat:"outros");return`<div class="txitem"><div class="txico" style="background:${cat.c}22">${cat.ico}</div><div class="txinfo"><div class="txname">${t.desc||""}</div><div class="txsub">${cat(.n} · ${fmtDate(t.d)}${t.note?" · "+t.note:""}</div>${t.quem?`<span class="txwho">👤 ${t.quem}</span>`:""}</div><div style="text-align:right"><div class="txval" style="color:${t.tipo==="receita"?"#2dc76d":"#f0483e"}">${t.tipo==="receita"?"+":"-"}${fmt(t.v)}</div></div></div>`;}).join("");
+    :recent.map(t=>{const cat=getCat(t.tipo==="gasto"?t.cat:"outros");return`<div class="txitem"><div class="txico" style="background:${cat.c}22">${cat.ico}</div><div class="txinfo"><div class="txname">${t.desc||""}</div><div class="txsub">${cat.n} · ${fmtDate(t.d)}${t.note?" · "+t.note:""}</div>${t.quem?`<span class="txwho">👤 ${t.quem}</span>`:""}</div><div style="text-align:right"><div class="txval" style="color:${t.tipo==="receita"?"#2dc76d":"#f0483e"}">${t.tipo==="receita"?"+":"-"}${fmt(t.v)}</div></div></div>`;}).join("");
   return`<div class="period-row"><button class="parrow" onclick="moveMes(-1)">‹</button><span class="plabel">${labelMes(UI.mes)}</span><button class="parrow" onclick="moveMes(1)">›</button></div>
     <div class="summary"><div class="scard"><div class="scard-lbl">📈 Receitas</div><div class="scard-val" style="color:#2dc76d">${fmt(rec)}</div></div><div class="scard"><div class="scard-lbl">📉 Gastos</div><div class="scard-val" style="color:#f0483e">${fmt(gas)}</div></div></div>
     <div class="chart-box"><div class="chart-head"><span class="chart-title">Fluxo financeiro</span><span class="chart-badge" style="color:${sal>=0?"#2dc76d":"#f0483e"};background:${sal>=0?"#2dc76d22":"#f0483e22"}">${sal>=0?"+":""}${fmt(sal)}</span></div><div class="chart-legend"><span class="cl-item"><span class="cl-dot" style="background:#2dc76d"></span>Receitas</span><span class="cl-item"><span class="cl-dot" style="background:#f0483e"></span>Gastos</span></div><div style="position:relative;height:145px"><canvas id="cline"></canvas></div></div>
     <div class="sec"><span class="sec-title">Últimas transações</span><span class="sec-link" onclick="goTab('txs')">Ver todas →</span></div>
-    <div class="txlist">${txhtml}</div>`;
-}
-
-// ── TRANSACTIONS ─ₔ�
-function renderTxs(){
-  const txs=txsMes().sort((a,b)=>b.d.localeCompare(a.d)||b._key.localeCompare(a._key));
-  let h=periodHdr();
-  if(!txs.length) return h+`<div class="empty"><div class="empty-ico">📋</div><div class="empty-txt">Nenhuma transação neste período.</div></div>`;
-  const byDay={};txs.forEach(t=>{(byDay[t.d]=byDay[t.d]||[]).push(t)});
-  Object.entries(byDay).sort((a,b)=>b[0].l">Últimas transações</span><span class="sec-link" onclick="goTab('txs')">Ver todas →</span></div>
     <div class="txlist">${txhtml}</div>`;
 }
 
