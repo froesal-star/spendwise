@@ -107,13 +107,13 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
 .catstat-fill{height:100%;border-radius:3px}
 .catstat-pct{font-size:10px;color:var(--text3);margin-top:4px;font-weight:600}
 #fab{position:absolute;bottom:calc(62px + env(safe-area-inset-bottom,0px) + 10px);left:50%;transform:translateX(-50%);width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--green),#00c9a7);border:none;color:#fff;font-size:27px;cursor:pointer;box-shadow:0 4px 20px rgba(45,199,109,.5);display:flex;align-items:center;justify-content:center;z-index:100;transition:transform .15s}
-#fab:active{transform:translateX(-50%) scale(.92)}
+#fab:active{transform:translateX(-50%) scale(.92]}
 #bottomnav{position:absolute;bottom:0;left:0;right:0;height:calc(62px + env(safe-area-inset-bottom,0px));background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:center;padding-bottom:env(safe-area-inset-bottom,0px);z-index:100}
 .bnbtn{flex:1;border:none;background:transparent;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;color:var(--text3);font-size:9px;font-weight:700;padding:6px 0;font-family:inherit;letter-spacing:.3px;transition:color .2s}
 .bnbtn .bnico{font-size:19px}.bnbtn.on{color:var(--green)}
 .overlay{position:absolute;inset:0;background:rgba(10,9,25,.8);z-index:300;display:none;align-items:flex-end;justify-content:center}
 .overlay.open{display:flex}
-.modal{background:var(--bg2);border-radius:var(--r) var(--r) 0 0;padding:18px 17px 36px;width:100%;max-height:88%;overflow-y:auto;scrollbar-width:none}
+.modal{background:var(--bg2);border-radius:var(--r) var(--r) 0 0;padding:18px 17px calc(36px + env(safe-area-inset-bottom,0px));width:100%;max-height:88%;overflow-y:auto;scrollbar-width:none}
 .modal::-webkit-scrollbar{display:none}
 .mhandle{width:38px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
 .mtitle{font-size:16px;font-weight:900;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center}
@@ -131,7 +131,7 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
 .finput,.fselect{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--rx);font-size:13px;font-family:inherit;color:var(--text);background:var(--bg3);outline:none;transition:border .2s}
 .finput:focus,.fselect:focus{border-color:var(--green)}
 .fselect option{background:var(--bg2)}
-.catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}
+.catgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px;max-height:160px;overflow-y:auto;padding-right:2px}
 .catbtn{border-radius:11px;padding:9px 3px;border:1.5px solid var(--border);background:var(--bg3);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;font-size:9px;font-weight:700;color:var(--text2);font-family:inherit;transition:all .2s;letter-spacing:.2px}
 .catbtn.on{border-color:var(--green);background:var(--gna);color:var(--green)}
 .catbtn-ico{font-size:19px}
@@ -252,6 +252,34 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <button class="sbtn" onclick="saveOrc()">Salvar Orçamento</button>
   </div></div>
 
+  <!-- MODAL EDITAR TX -->
+  <div class="overlay" id="ov-edittx"><div class="modal">
+    <div class="mhandle"></div>
+    <div class="mtitle">Editar Transação <button class="mclose" onclick="closeOv('edittx')">✕</button></div>
+    <div class="ttoggle">
+      <button class="ttbtn on-g" id="ett-gasto" onclick="setEditTipo('gasto')">— Gasto</button>
+      <button class="ttbtn" id="ett-receita" onclick="setEditTipo('receita')">+ Receita</button>
+    </div>
+    <div class="amtwrap"><span class="amtcur">R$</span>
+      <input class="amtinput" type="number" id="ef-val" placeholder="0,00" min="0" step="0.01" inputmode="decimal"/>
+    </div>
+    <div class="fg"><label class="flabel">Descrição</label>
+      <input class="finput" type="text" id="ef-desc" placeholder="Ex: Almoço, Salário..."/>
+    </div>
+    <div class="frow">
+      <div><label class="flabel">Data</label><input class="finput" type="date" id="ef-data"/></div>
+      <div><label class="flabel">Carteira</label><select class="fselect" id="ef-wallet"></select></div>
+    </div>
+    <div id="ef-cat-sec"><label class="flabel">Categoria</label>
+      <div class="catgrid" id="editcatgrid"></div>
+    </div>
+    <div class="fg"><label class="flabel">Nota (opcional)</label>
+      <input class="finput" type="text" id="ef-note" placeholder="Observação..."/>
+    </div>
+    <input type="hidden" id="ef-key"/>
+    <button class="sbtn" onclick="updateTx()">💾 Salvar alterações</button>
+  </div></div>
+
   <!-- MODAL CATEGORIA -->
   <div class="overlay" id="ov-cat"><div class="modal">
     <div class="mhandle"></div>
@@ -275,7 +303,7 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
 const DEFAULT_CATS=[
   {id:"casa",n:"Casa",ico:"🏠",c:"#8B5CF6"},
   {id:"supermercado",n:"Supermercado",ico:"🛒",c:"#10B981"},
-  {id:"carro",n:"Carro",ico:"🚗",c:"#3B82F6"},
+  {id:"carro",n:"Carro",ico:"🚗",c:"#B82F6"},
   {id:"murilo",n:"Murilo",ico:"👦",c:"#F59E0B"},
   {id:"farmacia",n:"Farmácia",ico:"💊",c:"#EF4444"},
   {id:"saudebeleza",n:"Saúde/Beleza",ico:"💆",c:"#EC4899"},
@@ -283,7 +311,7 @@ const DEFAULT_CATS=[
   {id:"combustivel",n:"Combustível",ico:"⛽",c:"#F97316"},
   {id:"escola",n:"Escola",ico:"🎒",c:"#06B6D4"},
   {id:"viagem",n:"Viagem",ico:"✈️",c:"#6366F1"},
-  {id:"lazer",n:"Lazer",ico:"🎉",c:"#fbbf24"},
+  {id:"lazi%r",n:"Lazer",ico:"🎉",c:"#fbbf24"},
   {id:"outros",n:"Outros",ico:"💡",c:"#7C5CBF"},
 ];
 const EMOJIS=["🏠","🛒","🚗","👦","👧","💊","💆","👗","⛽","🎒","✈️","🎉","💡","🍔","🍕","☕","🎮","📱","💻","🏋️","🐾","🐶","🌿","💈","🏥","🎓","📚","💼","💰","🎁","🛠️","🏖️","🎵","🚌","🚕","🛵","🧴","🧹","💧","⚡","🌐","📦","🧸","🏊","🎨","🍷","🧃","🛍️"];
@@ -303,7 +331,7 @@ function getCat(id){return catsArr().find(c=>c.id===id||c._key===id)||{n:"Outros
 
 function mesAtual(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
 function hoje(){return new Date().toISOString().split("T")[0]}
-function fmt(v){return"R$ "+Math.abs(+v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmt(v){return"R$ "+Math.abs(+v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:3})}
 function fmtDate(d){return d?d.split("-").reverse().join("/"):""}
 function labelMes(m){if(!m)return"";const[a,mo]=m.split("-");return new Date(a,mo-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}
 function txsArr(){return Object.entries(DB_txs).map(([k,v])=>({...v,_key:k}))}
@@ -319,7 +347,7 @@ function initFirebase(){
   onValue(ref(db,"wallets"),snap=>{DB_wallets=snap.val()||{};if(!Object.keys(DB_wallets).length)window._push(ref(db,"wallets"),{nome:"Carteira Conjunta",saldo:0,gi:0});render()});
   onValue(ref(db,"txs"),snap=>{DB_txs=snap.val()||{};dot.className="sync-dot ok";render()},()=>{dot.className="sync-dot err"});
   onValue(ref(db,"orcs"),snap=>{DB_orcs=snap.val()||{};render()});
-  onValue(ref(db,"cats"),snap=>{DB_cats=snap.val()||{};render()});
+  onValue(ref(db,"cats"),snap=>{DBRcats=snap.val()||{};render()});
   document.getElementById("loader").style.display="none";
 }
 window.addEventListener("fbready",initFirebase);
@@ -345,17 +373,23 @@ function render(){
 // ── HOME ──
 function renderHome(){
   const txs=txsMes(),rec=txs.filter(t=>t.tipo==="receita").reduce((s,t)=>s+(+t.v),0),gas=txs.filter(t=>t.tipo==="gasto").reduce((s,t)=>s+(+t.v),0),sal=rec-gas;
-  const wcards=walletsArr().map(w=>{const g=GRADS[w.gi%GRADS.length],wr=txsArr().filter(t=>t.wid===w._key&&t.tipo==="receita").reduce((s,t)=>s+(+t.v),0),wg=txsArr().filter(t=>t.wid===w._key&&t.tipo==="gasto").reduce((s,t)=>s+(+t.v),0);
-    return`<div class="wcard" style="background:linear-gradient(135deg,${g[0]},${g[1]})"><div class="wcard-glow"></div><div class="wcard-glow2"></div><div class="wcard-lbl">${w.nome}</div><div class="wcard-bal">${fmt(saldoW(w))}</div><div class="wcard-foot"><span>↑ ${fmt(wr)}</span><span>↓ ${fmt(wg)}</span></div></div>`;
-  }).join("");
   const recent=txsArr().sort((a,b)=>b._key.localeCompare(a._key)).slice(0,5);
   const txhtml=recent.length===0?`<div class="empty"><div class="empty-ico">💸</div><div class="empty-txt">Nenhuma transação ainda.<br>Toque <strong>+</strong> para adicionar!</div></div>`
     :recent.map(t=>{const cat=getCat(t.tipo==="gasto"?t.cat:"outros");return`<div class="txitem"><div class="txico" style="background:${cat.c}22">${cat.ico}</div><div class="txinfo"><div class="txname">${t.desc||""}</div><div class="txsub">${cat.n} · ${fmtDate(t.d)}${t.note?" · "+t.note:""}</div>${t.quem?`<span class="txwho">👤 ${t.quem}</span>`:""}</div><div style="text-align:right"><div class="txval" style="color:${t.tipo==="receita"?"#2dc76d":"#f0483e"}">${t.tipo==="receita"?"+":"-"}${fmt(t.v)}</div></div></div>`;}).join("");
   return`<div class="period-row"><button class="parrow" onclick="moveMes(-1)">‹</button><span class="plabel">${labelMes(UI.mes)}</span><button class="parrow" onclick="moveMes(1)">›</button></div>
-    <div class="wscroll">${wcards}<button class="wcard-add" onclick="openOv('wallet')">+</button></div>
     <div class="summary"><div class="scard"><div class="scard-lbl">📈 Receitas</div><div class="scard-val" style="color:#2dc76d">${fmt(rec)}</div></div><div class="scard"><div class="scard-lbl">📉 Gastos</div><div class="scard-val" style="color:#f0483e">${fmt(gas)}</div></div></div>
     <div class="chart-box"><div class="chart-head"><span class="chart-title">Fluxo financeiro</span><span class="chart-badge" style="color:${sal>=0?"#2dc76d":"#f0483e"};background:${sal>=0?"#2dc76d22":"#f0483e22"}">${sal>=0?"+":""}${fmt(sal)}</span></div><div class="chart-legend"><span class="cl-item"><span class="cl-dot" style="background:#2dc76d"></span>Receitas</span><span class="cl-item"><span class="cl-dot" style="background:#f0483e"></span>Gastos</span></div><div style="position:relative;height:145px"><canvas id="cline"></canvas></div></div>
     <div class="sec"><span class="sec-title">Últimas transações</span><span class="sec-link" onclick="goTab('txs')">Ver todas →</span></div>
+    <div class="txlist">${txhtml}</div>`;
+}
+
+// ── TRANSACTIONS ──
+function renderTxs(){
+  const txs=txsMes().sort((a,b)=>b.d.localeCompare(a.d)||b._key.localeCompare(a._key));
+  let h=periodHdr();
+  if(!txs.length) return h+`<div class="empty"><div class="empty-ico">📋</div><div class="empty-txt">Nenhuma transação neste período.</div></div>`;
+  const byDay={};txs.forEach(t=>{(byDay[t.d]=byDay[t.d]||[]).push(t)});
+  Object.entries(byDay).sort((a,b)=>b#-title">Últimas transações</span><span class="sec-link" onclick="goTab('txs')">Ver todas →</span></div>
     <div class="txlist">${txhtml}</div>`;
 }
 
@@ -369,7 +403,7 @@ function renderTxs(){
     const dt=items.reduce((s,t)=>s+(t.tipo==="receita"?+t.v:-(+t.v)),0);
     h+=`<div class="tx-day-lbl"><span>${fmtDate(d)}</span><span style="color:${dt>=0?"#2dc76d":"#f0483e"}">${dt>=0?"+":""}${fmt(dt)}</span></div>`;
     h+=`<div class="txlist" style="margin-bottom:6px">`+items.map(t=>{const cat=getCat(t.tipo==="gasto"?t.cat:"outros");const w=walletsArr().find(x=>x._key===t.wid);
-      return`<div class="txitem"><div class="txico" style="background:${cat.c}22">${cat.ico}</div><div class="txinfo"><div class="txname">${t.desc||""}</div><div class="txsub">${cat.n}${w?" · "+w.nome:""}${t.note?" · "+t.note:""}</div>${t.quem?`<span class="txwho">👤 ${t.quem}</span>`:""}</div><div style="text-align:right"><div class="txval" style="color:${t.tipo==="receita"?"#2dc76d":"#f0483e"}">${t.tipo==="receita"?"+":"-"}${fmt(t.v)}</div><button class="delbtn" onclick="delTx('${t._key}')">🗑</button></div></div>`;
+      return`<div class="txitem"><div class="txico" style="background:${cat.c}22">${cat.ico}</div><div class="txinfo"><div class="txname">${t.desc||""}</div><div class="txsub">${cat.n}${w?" · "+w.nome:""}${t.note?" · "+t.note:""}</div>${t.quem?`<span class="txwho">👤 ${t.quem}</span>`:""}</div><div style="text-align:right"><div class="txval" style="color:${t.tipo==="receita"?"#2dc76d":"#f0483e"}">${t.tipo==="receita"?"+":"-"}${fmt(t.v)}</div><div style="display:flex;gap:2px;justify-content:flex-end;margin-top:3px"><button class="delbtn" onclick="editTx('${t._key}')" style="color:var(--text2)">✏️</button><button class="delbtn" onclick="delTx('${t._key}')">🗑</button></div></div></div>`;
     }).join("")+`</div>`;
   });
   return h;
@@ -382,27 +416,32 @@ function renderBudgets(){
   const orcs=orcsArr();
   if(!orcs.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido.</div></div>`;
   const[ano,mes]=UI.mes.split("-").map(Number),dim=new Date(ano,mes,0).getDate(),today=new Date(),dp=today.getFullYear()===ano&&today.getMonth()+1===mes?today.getDate():dim,dl=Math.max(0,dim-dp);
-  orcs.forEach(o=>{const cat=getCat(o.cat),spent=txs.filter(t=>t.tipo==="gasto"&&t.cat===o.cat).reduce((s,t)=>s+(+t.v),0),pct=Math.min(100,Math.round(spent/(+o.lim)*100)),left=Math.max(0,+o.lim-spent),daily=dl>0?(left/dl):0,bc=pct>90?"#f0483e":pct>65?"#fbbf24":"#2dc76d";
-    h+=`<div class="bcard"><div class="bcard-row"><div class="bcard-left"><div class="bico" style="background:${cat.c}22">${cat.ico}</div><div><div class="bname">${cat.n}</div><div class="bsub">${fmt(spent)} de ${fmt(o.lim)}</div></div></div><div style="text-align:right"><div class="bpct" style="color:${bc}">${pct}%</div><button class="delbtn" onclick="delOrc('${o._key}')">🗑</button></div></div><div class="prog"><div class="prog-fill" style="width:${pct}%;background:${bc}"></div></div><div class="prog-days">Restam ${fmt(left)} · ${fmt(daily)}/dia · ${dl} dias</div></div>`;
-  });
-  return h;
-}
-
-// ── STATS ──
-function renderStats(){
-  const txs=txsMes(),gas=txs.filter(t=>t.tipo==="gasto"),totalG=gas.reduce((s,t)=>s+(+t.v),0),rec=txs.filter(t=>t.tipo==="receita").reduce((s,t)=>s+(+t.v),0),sal=rec-totalG;
-  const byCat={},byPerson={};
-  gas.forEach(t=>{byCat[t.cat]=(byCat[t.cat]||0)+(+t.v);if(t.quem)byPerson[t.quem]=(byPerson[t.quem]||0)+(+t.v)});
-  const sorted=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
-  let h=periodHdr();
-  h+=`<div class="summary"><div class="scard"><div class="scard-lbl">📈 Receitas</div><div class="scard-val" style="color:#2dc76d">${fmt(rec)}</div></div><div class="scard"><div class="scard-lbl">📉 Gastos</div><div class="scard-val" style="color:#f0483e">${fmt(totalG)}</div></div><div class="scard"><div class="scard-lbl">💰 Saldo</div><div class="scard-val" style="color:${sal>=0?"#2dc76d":"#f0483e"}">${fmt(sal)}</div></div><div class="scard"><div class="scard-lbl">🔖 Lançamentos</div><div class="scard-val" style="color:#9b7fd4">${txs.length}</div></div></div>`;
-  if(Object.keys(byPerson).length>1){
-    h+=`<div class="sec"><span class="sec-title">👥 Gastos por pessoa</span></div>`;
-    Object.entries(byPerson).sort((a,b)=>b[1]-a[1]).forEach(([nome,val])=>{const pct=totalG>0?((val/totalG)*100).toFixed(0):0;h+=`<div class="catstat"><div class="txico" style="background:#7b5ea722;width:38px;height:38px;border-radius:12px;font-size:17px;flex-shrink:0">👤</div><div class="catstat-bars"><div class="catstat-top"><span class="catstat-name">${nome}</span><span class="catstat-val">${fmt(val)}</span></div><div class="catstat-bar"><div class="catstat-fill" style="width:${pct}%;background:#7b5ea7"></div></div><div class="catstat-pct">${pct}% do total</div></div></div>`;});
-  }
-  if(sorted.length) h+=`<div class="chart-box" style="margin-top:4px"><div class="chart-head"><span class="chart-title">Gastos por categoria</span></div><div style="position:relative;height:195px"><canvas id="cpie"></canvas></div></div>`;
-  h+=`<div class="sec"><span class="sec-title">Detalhamento</span></div>`;
-  if(!sorted.length) return h+`<div class="empty"><div class="empty-ico">📊</div><div class="empty-txt">Sem gastos neste período.</div></div>`;
+  orcs.forEach(o=>{const cat=getCat(o.cat),spent=txs.filter(t=>t.tipo==="gasto"&&t.cat===o.cat).reduce((s,t)=>s+(+����K
+K�SX]�Z[��X]���[�
+�[��
+�˛[JJ�L
+JKY�SX]�X^
+
+�˛[K\�[�
+KZ[OY��Y��
+N���\��LȈٌ
+�H�����OȈ٘�������̙�͙�
+�X]��\��H���\���]��\��H���\�\��ȏ�]��\��H���\�[Y���]��\��H��X�Ȉ�[OH��X��ܛ�[����]��L������]�X��O�]��]��]��\��H���[YH����]��O�]��]��\��H���X���ٛ]
+�[�
+_HH	ٛ]
+˛[J_O�]���]���]��]��[OH�^X[Yێ��Y���]��\��H�����[OH���܎�ؘ�H����IO�]���]ۈ�\��H�[���ۘ�X��H�[ܘ�	��˗��^_I�H��'��O؝]ۏ��]���]��]��\��H���ȏ�]��\��H����Y�[��[OH��Y���INؘX��ܛ�[��ؘ�H���]���]��]��\��H����Y^\ȏ��\�[H	ٛ]
+Y�
+_H0��	ٛ]
+Z[J_K�XH0��	�HX\��]���]��JN�]\��B����8� 8� �U�8� 8� ��[��[ۈ�[�\��]�
+^�ۜ��]�Y\�
+K�\�]˙�[\�O��\�OOH��\�ȊK�[�Y�\˜�YX�J
+�
+OO���
+���K
+K�X�]˙�[\�O��\�OOH��X�Z]H�K��YX�J
+�
+OO���
+��B�b����6��&V2�F�F�s��6��7B'�6C׷��'�W'6��׷Ӱ�v2�f�$V6��C��'�j�E�B�6E�҆'�6E�B�6E�������B�b���b�B�VVҖ'�W'6��B�VV��҆'�W'6��B�VV��������B�b�ғ��6��7B6�'FVC��&�V7B�V�G&�W2�'�6B��6�'B���"���%����ғ���WB��W&��D�G"��������F�b6�73�'7V��'�#��F�b6�73�'66&B#��F�b6�73�'66&B��&�#�	�8�&V6V�F3��F�c��F�b6�73�'66&B�f�"7G��S�&6���#�3&F3sfB#�G�f�B�&V2����F�c���F�c��F�b6�73�'66&B#��F�b6�73�'66&B��&�#�	�8�v7F�3��F�c��F�b6�73�'66&B�f�"7G��S�&6���#�6cC�6R#�G�f�B�F�F�r����F�c���F�c��F�b6�73�'66&B#��F�b6�73�'66&B��&�#�	�+6�F���F�c��F�b6�73�'66&B�f�"7G��S�&6���#�G�6����"3&F3sfB#�"6cC�6R'�#�G�f�B�6���F�c���F�c��F�b6�73�'66&B#��F�b6�73�'66&B��&�#�	�Ib��:v�V�F�3��F�c��F�b6�73�'66&B�f�"7G��S�&6���#�3�#vfCB#�G�G�2��V�wF����F�c���F�c���F�c����b��&�V7B�W�2�'�W'6����V�wF���������F�b6�73�'6V2#��7�6�73�'6V2�F�F�R#�	�Rv7F�2�"W76���7����F�c����&�V7B�V�G&�W2�'�W'6���6�'B���"���%����Ғ�f�$V6�������R�f�ғ��6��7B7C�F�F�s��f��F�F�r����F�f��VB��������F�b6�73�&6G7FB#��F�b6�73�'G��6�"7G��S�&&6�w&�V�C�3v#VVs##�v�GF��3����V�v�C�3���&�&FW"�&F�W3�'��f��B�6��S�w��f�W��6�&�泣#�	�C��F�c��F�b6�73�&6G7FB�&'2#��F�b6�73�&6G7FB�F�#��7�6�73�&6G7FB���R#�G����W���7���7�6�73�&6G7FB�f�#�G�f�B�f���7����F�c��F�b6�73�&6G7FB�&"#��F�b6�73�&6G7FB�f���"7G��S�'v�GF��G�7G�S�&6�w&�V�C�3v#VVr#���F�c���F�c��F�b6�73�&6G7FB�7B#�G�7G�RF�F�F���F�c���F�c���F�c��ғ��Т�b�6�'FVB��V�wF������F�b6�73�&6�'B�&��"7G��S�&�&v���F��G�#��F�b6�73�&6�'BֆVB#��7�6�73�&6�'B�F�F�R#�v7F�2�"6FVv�&���7����F�c��F�b7G��S�'�6�F���&V�F�fS��V�v�C��W�#��6�f2�C�&7�R#���6�f3���F�c���F�c�������F�b6�73�'6V2#��7�6�73�'6V2�F�F�R#�FWFƆ�V�F���7����F�c����b�6�'FVB��V�wF��&WGW&����F�b6�73�&V�G�#��F�b6�73�&V�G�֖6�#�	�8���><div class="empty-txt">Sem gastos neste período.</div></div>`;
   sorted.forEach(([id,val])=>{const cat=getCat(id),pct=totalG>0?((val/totalG)*100).toFixed(1):0;h+=`<div class="catstat"><div class="txico" style="background:${cat.c}22;width:38px;height:38px;border-radius:12px;font-size:17px;flex-shrink:0">${cat.ico}</div><div class="catstat-bars"><div class="catstat-top"><span class="catstat-name">${cat.n}</span><span class="catstat-val">${fmt(val)}</span></div><div class="catstat-bar"><div class="catstat-fill" style="width:${pct}%;background:${cat.c}"></div></div><div class="catstat-pct">${pct}% do total</div></div></div>`;});
   return h;
 }
@@ -520,10 +559,59 @@ function saveOrc(){
   window._push(window._ref(window._db,"orcs"),{cat,lim});closeOv("orc");document.getElementById("o-lim").value="";
 }
 function delTx(key){if(confirm("Remover esta transação?"))window._remove(window._ref(window._db,"txs/"+key))}
+
+let editTipoAtual="gasto",editCatSel="";
+function editTx(key){
+  const t=DB_txs[key];if(!t)return;
+  editTipoAtual=t.tipo||"gasto";
+  editCatSel=t.cat||"";
+  document.getElementById("ef-key").value=key;
+  document.getElementById("ef-val").value=t.v||"";
+  document.getElementById("ef-desc").value=t.desc||"";
+  document.getElementById("ef-data").value=t.d||"";
+  document.getElementById("ef-note").value=t.note||"";
+  // wallet
+  const fw=document.getElementById("ef-wallet");
+  fw.innerHTML=walletsArr().map(w=>`<option value="${w._key}"${w._key===t.wid?" selected":""}>${w.nome}</option>`).join("");
+  // tipo toggle
+  setEditTipo(editTipoAtual);
+  // cat grid
+  fillEditCatGrid();
+  openOv('edittx');
+}
+function setEditTipo(t){
+  editTipoAtual=t;
+  document.getElementById("ett-gasto").className="ttbtn"+(t==="gasto"?" on-g":"");
+  document.getElementById("ett-receita").className="ttbtn"+(t==="receita"?" on-r":"");
+  const cs=document.getElementById("ef-cat-sec");if(cs)cs.style.display=t==="gasto"?"block":"none";
+}
+function fillEditCatGrid(){
+  const el=document.getElementById("editcatgrid");if(!el)return;
+  const cats=catsArr();
+  if(!editCatSel) editCatSel=cats[0]?._key||cats[0]?.id||"";
+  el.innerHTML=cats.map(c=>{const k=c._key||c.id;return`<button class="catbtn${editCatSel===k?" on":""}" onclick="selEditCat('${k}')"><span class="catbtn-ico">${c.ico}</span>${c.n}</button>`}).join("");
+}
+function selEditCat(id){editCatSel=id;fillEditCatGrid();}
+function updateTx(){
+  const key=document.getElementById("ef-key").value;
+  const v=parseFloat(document.getElementById("ef-val").value);
+  const desc=document.getElementById("ef-desc").value.trim();
+  const d=document.getElementById("ef-data").value;
+  const wid=document.getElementById("ef-wallet").value;
+  const note=document.getElementById("ef-note").value.trim();
+  if(!v||v<=0){alert("Informe o valor.");return}
+  if(!desc){alert("Informe a descrição.");return}
+  if(!d){alert("Informe a data.");return}
+  const orig=DB_txs[key];
+  const data={tipo:editTipoAtual,v,desc,d,cat:editTipoAtual==="gasto"?editCatSel:"outros",wid,quem:orig?.quem||meuNome,ts:orig?.ts||Date.now()};
+  if(note)data.note=note;
+  window._set(window._ref(window._db,"txs/"+key),data);
+  closeOv('edittx');
+}
 function delOrc(key){if(confirm("Remover orçamento?"))window._remove(window._ref(window._db,"orcs/"+key))}
 function goTab(t){UI.tab=t;render();document.getElementById("scroll").scrollTop=0}
 function moveMes(d){const[a,m]=UI.mes.split("-").map(Number),nd=new Date(a,m-1+d,1);UI.mes=nd.getFullYear()+"-"+String(nd.getMonth()+1).padStart(2,"0");render()}
-document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("open")}));
+document.querySelector(".content").onscroll=function(){requestAnimationFrame(=>{if(e.target===o)o.classList.remove("open")}));
 </script>
 </body>
 </html>
