@@ -337,7 +337,7 @@ function txsArr(){return Object.entries(DB_txs).map(([k,v])=>({...v,_key:k}))}
 function walletsArr(){return Object.entries(DB_wallets).map(([k,v])=>({...v,_key:k}))}
 function orcsArr(){return Object.entries(DB_orcs).map(([k,v])=>({...v,_key:k}))}
 function txsMes(m){return txsArr().filter(t=>t.d&&t.d.startsWith(m||UI.mes))}
-function saldoW(w){return(+{.saldo||0)+txsArr().filter(t=>t.wid===w._key).reduce((s,t)=>s+(t.tipo==="receita"?+t.v:-(+t.v)),0)}
+function saldoW(w){return(+w.saldo||0)+txsArr().filter(t=>t.wid===w._key).reduce((s,t)=>s+(t.tipo==="receita"?+t.v:-(+t.v)),0)}
 function promptNome(){const n=prompt("Seu nome:",meuNome);if(n&&n.trim()){meuNome=n.trim();;localStorage.setItem("sw_nome",meuNome);document.getElementById("tb-avatar").textContent=meuNome.slice(0,2).toUpperCase()}}
 
 function initFirebase(){
