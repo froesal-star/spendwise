@@ -375,7 +375,7 @@ function renderHome(){
   const wcards=walletsArr().map(w=>{const g=GRADS[w.gi%GRADS.length],wr=txsArr().filter(t=>t.wid===w._key&&t.tipo==="receita").reduce((s,t)=>s+(+t.v),0),wg=txsArr().filter(t=>t.wid===w._key&&t.tipo==="gasto").reduce((s,t)=>s+(+t.v),0);
     return`<div class="wcard" style="background:linear-gradient(135deg,${g[0]},${g[1]})"><div class="wcard-glow"></div><div class="wcard-glow2"></div><div class="wcard-lbl">${w.nome}</div><div class="wcard-bal">${fmt(saldoW(w))}</div><div class="wcard-foot"><span>↑ ${fmt(wr)}</span><span>↓ ${fmt(wg)}</span></div></div>`;
   }).join("");
-  const recent=txsArr().sort((a,b)=>b._key.localeCompare(a._key)).slice(0,5);
+  const recent=txsArr().sort((a,b)=>(b.d||"").localeCompare(a.d||"")||(b.ts||0)-(a.ts||0)).slice(0,5);
   const txhtml=recent.length===0?`<div class="empty"><div class="empty-ico">💸</div><div class="empty-txt">Nenhuma transação ainda.<br>Toque <strong>+</strong> para adicionar!</div></div>`
     :recent.map(t=>{const cat=getCat(t.tipo==="gasto"?t.cat:"outros");return`<div class="txitem"><div class="txico" style="background:${cat.c}22">${cat.ico}</div><div class="txinfo"><div class="txname">${t.desc||""}</div><div class="txsub">${cat.n} · ${fmtDate(t.d)}${t.note?" · "+t.note:""}</div>${t.quem?`<span class="txwho">👤 ${t.quem}</span>`:""}</div><div style="text-align:right"><div class="txval" style="color:${t.tipo==="receita"?"#2dc76d":"#f0483e"}">${t.tipo==="receita"?"+":"-"}${fmt(t.v)}</div></div></div>`;}).join("");
   return`<div class="period-row"><button class="parrow" onclick="moveMes(-1)">‹</button><span class="plabel">${labelMes(UI.mes)}</span><button class="parrow" onclick="moveMes(1)">›</button></div>
@@ -426,7 +426,15 @@ function renderStats(){
     h+=`<div class="sec"><span class="sec-title">👥 Gastos por pessoa</span></div>`;
     Object.entries(byPerson).sort((a,b)=>b[1]-a[1]).forEach(([nome,val])=>{const pct=totalG>0?((val/totalG)*100).toFixed(0):0;h+=`<div class="catstat"><div class="txico" style="background:#7b5ea722;width:38px;height:38px;border-radius:12px;font-size:17px;flex-shrink:0">👤</div><div class="catstat-bars"><div class="catstat-top"><span class="catstat-name">${nome}</span><span class="catstat-val">${fmt(val)}</span></div><div class="catstat-bar"><div class="catstat-fill" style="width:${pct}%;background:#7b5ea7"></div></div><div class="catstat-pct">${pct}% do total</div></div></div>`;});
   }
-  if(sorted.length) h+=`<div class="chart-box" style="margin-top:4px"><div class="chart-head"><span class="chart-title">Gastos por categoria</span></div><div style="position:relative;height:195px"><canvas id="cpie"></canvas></div></div>`;
+  if(sorted.length){
+    const allGastos=gas;
+    const pessoas=[...new Set(allGastos.map(t=>t.quem).filter(Boolean))].sort();
+    const totalP1=pessoas[0]?allGastos.filter(t=>t.quem===pessoas[0]).reduce((s,t)=>s+(+t.v),0):0;
+    const totalP2=pessoas[1]?allGastos.filter(t=>t.quem===pessoas[1]).reduce((s,t)=>s+(+t.v),0):0;
+    h+=`<div class="chart-box" style="margin-top:4px"><div class="chart-head"><span class="chart-title">👥 Gastos totais do casal</span><span class="chart-badge" style="color:#f0483e;background:#f0483e22">${fmt(totalG)}</span></div><div style="position:relative;height:195px"><canvas id="cpie"></canvas></div></div>`;
+    if(pessoas.length>=1){h+=`<div class="chart-box"><div class="chart-head"><span class="chart-title">👤 ${pessoas[0]}</span><span class="chart-badge" style="color:#7b5ea7;background:#7b5ea722">${fmt(totalP1)}</span></div><div style="position:relative;height:195px"><canvas id="cpie2"></canvas></div></div>`;}
+    if(pessoas.length>=2){h+=`<div class="chart-box"><div class="chart-head"><span class="chart-title">👤 ${pessoas[1]}</span><span class="chart-badge" style="color:#e91e8c;background:#e91e8c22">${fmt(totalP2)}</span></div><div style="position:relative;height:195px"><canvas id="cpie3"></canvas></div></div>`;}
+  }
   h+=`<div class="sec"><span class="sec-title">Detalhamento</span></div>`;
   if(!sorted.length) return h+`<div class="empty"><div class="empty-ico">📊</div><div class="empty-txt">Sem gastos neste período.</div></div>`;
   sorted.forEach(([id,val])=>{const cat=getCat(id),pct=totalG>0?((val/totalG)*100).toFixed(1):0;h+=`<div class="catstat"><div class="txico" style="background:${cat.c}22;width:38px;height:38px;border-radius:12px;font-size:17px;flex-shrink:0">${cat.ico}</div><div class="catstat-bars"><div class="catstat-top"><span class="catstat-name">${cat.n}</span><span class="catstat-val">${fmt(val)}</span></div><div class="catstat-bar"><div class="catstat-fill" style="width:${pct}%;background:${cat.c}"></div></div><div class="catstat-pct">${pct}% do total</div></div></div>`;});
@@ -499,11 +507,18 @@ function buildLine(){
   for(let d=1;d<=dim;d++){const k=`${UI.mes}-${String(d).padStart(2,"0")}`,day=txsArr().filter(t=>t.d===k);labels.push(d);rD.push(day.filter(t=>t.tipo==="receita").reduce((s,t)=>s+(+t.v),0));gD.push(day.filter(t=>t.tipo==="gasto").reduce((s,t)=>s+(+t.v),0))}
   CH.line=new Chart(el,{type:"line",data:{labels,datasets:[{label:"Receitas",data:rD,borderColor:"#2dc76d",backgroundColor:"rgba(45,199,109,.12)",tension:.45,fill:true,pointRadius:3,pointBackgroundColor:"#2dc76d",pointBorderColor:"#13112a",pointBorderWidth:2},{label:"Gastos",data:gD,borderColor:"#f0483e",backgroundColor:"rgba(240,72,62,.10)",tension:.45,fill:true,pointRadius:3,pointBackgroundColor:"#f0483e",pointBorderColor:"#13112a",pointBorderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:"#5e5a8a",font:{size:9}},grid:{color:"#2e2b5230"}},y:{ticks:{color:"#5e5a8a",font:{size:9},callback:v=>"R$"+v},grid:{color:"#2e2b5230"}}}}});
 }
-function buildPie(){
-  const el=document.getElementById("cpie");if(!el)return;
-  const bc={};txsMes().filter(t=>t.tipo==="gasto").forEach(t=>{bc[t.cat]=(bc[t.cat]||0)+(+t.v)});
+function buildPieById(canvasId,chartKey,gastos){
+  const el=document.getElementById(canvasId);if(!el)return;
+  const bc={};gastos.forEach(t=>{bc[t.cat]=(bc[t.cat]||0)+(+t.v)});
   const entries=Object.entries(bc).sort((a,b)=>b[1]-a[1]);if(!entries.length)return;
-  CH.pie=new Chart(el,{type:"doughnut",data:{labels:entries.map(([id])=>getCat(id).n),datasets:[{data:entries.map(([,v])=>v),backgroundColor:entries.map(([id])=>getCat(id).c),borderWidth:3,borderColor:"#1e1c38",hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:"60%",plugins:{legend:{position:"bottom",labels:{color:"#9b96c9",font:{size:10},padding:8,boxWidth:10,usePointStyle:true}}}}});
+  CH[chartKey]=new Chart(el,{type:"doughnut",data:{labels:entries.map(([id])=>getCat(id).n),datasets:[{data:entries.map(([,v])=>v),backgroundColor:entries.map(([id])=>getCat(id).c),borderWidth:3,borderColor:"#1e1c38",hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:"60%",plugins:{legend:{position:"bottom",labels:{color:"#9b96c9",font:{size:10},padding:8,boxWidth:10,usePointStyle:true}}}}});
+}
+function buildPie(){
+  const allGastos=txsMes().filter(t=>t.tipo==="gasto");
+  const pessoas=[...new Set(allGastos.map(t=>t.quem).filter(Boolean))].sort();
+  buildPieById("cpie","pie",allGastos);
+  if(pessoas.length>=1) buildPieById("cpie2","pie2",allGastos.filter(t=>t.quem===pessoas[0]));
+  if(pessoas.length>=2) buildPieById("cpie3","pie3",allGastos.filter(t=>t.quem===pessoas[1]));
 }
 
 function fillCatGrid(){
