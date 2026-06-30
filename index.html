@@ -509,9 +509,11 @@ function buildLine(){
 }
 function buildPieById(canvasId,chartKey,gastos){
   const el=document.getElementById(canvasId);if(!el)return;
-  const bc={};gastos.forEach(t=>{bc[t.cat]=(bc[t.cat]||0)+(+t.v)});
+  // Agrupa pelo NOME da categoria para evitar duplicatas (_key vs id)
+  const bc={},bcc={};
+  gastos.forEach(t=>{const cat=getCat(t.cat);const n=cat.n;bc[n]=(bc[n]||0)+(+t.v);bcc[n]=cat.c;});
   const entries=Object.entries(bc).sort((a,b)=>b[1]-a[1]);if(!entries.length)return;
-  CH[chartKey]=new Chart(el,{type:"doughnut",data:{labels:entries.map(([id])=>getCat(id).n),datasets:[{data:entries.map(([,v])=>v),backgroundColor:entries.map(([id])=>getCat(id).c),borderWidth:3,borderColor:"#1e1c38",hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:"60%",plugins:{legend:{position:"bottom",labels:{color:"#9b96c9",font:{size:10},padding:8,boxWidth:10,usePointStyle:true}}}}});
+  CH[chartKey]=new Chart(el,{type:"doughnut",data:{labels:entries.map(([n])=>n),datasets:[{data:entries.map(([,v])=>v),backgroundColor:entries.map(([n])=>bcc[n]),borderWidth:3,borderColor:"#1e1c38",hoverOffset:8}]},options:{responsive:true,maintainAspectRatio:false,cutout:"60%",plugins:{legend:{position:"bottom",labels:{color:"#9b96c9",font:{size:10},padding:8,boxWidth:10,usePointStyle:true}}}}});
 }
 function buildPie(){
   const allGastos=txsMes().filter(t=>t.tipo==="gasto");
