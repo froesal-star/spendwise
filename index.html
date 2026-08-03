@@ -99,13 +99,26 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
 .prog{height:7px;border-radius:4px;background:var(--bg3);overflow:hidden;margin-bottom:4px}
 .prog-fill{height:100%;border-radius:4px;transition:width .5s}
 .prog-days{font-size:10px;color:var(--text3);text-align:right}
-.catstat{background:var(--card);border-radius:var(--rs);padding:12px 14px;border:1px solid var(--border);display:flex;align-items:center;gap:11px;margin-bottom:6px}
-.catstat-bars{flex:1}
-.catstat-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
-.catstat-name{font-weight:700}.catstat-val{font-weight:900}
+.catstat-wrap{margin-bottom:6px;border-radius:var(--rs);overflow:hidden;border:1px solid var(--border);background:var(--card)}
+.catstat{padding:12px 14px;display:flex;align-items:center;gap:11px;cursor:pointer;user-select:none;transition:background .15s}
+.catstat:active{background:var(--card2)}
+.catstat-bars{flex:1;min-width:0}
+.catstat-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;gap:8px}
+.catstat-name{font-weight:700}.catstat-val{font-weight:900;white-space:nowrap}
 .catstat-bar{height:5px;border-radius:3px;background:var(--bg3)}
 .catstat-fill{height:100%;border-radius:3px}
 .catstat-pct{font-size:10px;color:var(--text3);margin-top:4px;font-weight:600}
+.catstat-chev{font-size:11px;color:var(--text3);flex-shrink:0;transition:transform .2s}
+.catstat-chev.open{transform:rotate(180deg);color:var(--green)}
+.catstat-detail{max-height:0;overflow:hidden;transition:max-height .25s ease}
+.catstat-detail.open{max-height:2000px}
+.catstat-detail-inner{padding:0 12px 12px;display:flex;flex-direction:column;gap:5px;border-top:1px solid var(--border);padding-top:9px;margin-top:1px}
+.catdet-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;background:var(--bg3);border-radius:9px}
+.catdet-info{min-width:0}
+.catdet-name{font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.catdet-date{font-size:10px;color:var(--text2);margin-top:1px;font-weight:600}
+.catdet-val{font-size:12px;font-weight:900;color:var(--red);white-space:nowrap;flex-shrink:0}
+.catdet-empty{font-size:11px;color:var(--text3);text-align:center;padding:8px 0;font-weight:600}
 #fab{position:absolute;bottom:calc(62px + env(safe-area-inset-bottom,0px) + 10px);left:50%;transform:translateX(-50%);width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--green),#00c9a7);border:none;color:#fff;font-size:27px;cursor:pointer;box-shadow:0 4px 20px rgba(45,199,109,.5);display:flex;align-items:center;justify-content:center;z-index:100;transition:transform .15s}
 #fab:active{transform:translateX(-50%) scale(.92)}
 #bottomnav{position:absolute;bottom:0;left:0;right:0;height:calc(62px + env(safe-area-inset-bottom,0px));background:var(--bg2);border-top:1px solid var(--border);display:flex;align-items:center;padding-bottom:env(safe-area-inset-bottom,0px);z-index:100}
@@ -319,6 +332,7 @@ const COLORS=["#EF4444","#F97316","#F59E0B","#fbbf24","#10B981","#2dc76d","#06B6
 const GRADS=[["#2dc76d","#00c9a7"],["#7b5ea7","#e91e8c"],["#f97316","#fbbf24"],["#3b82f6","#06b6d4"],["#ef4444","#f97316"],["#14b8a6","#3b82f6"]];
 
 let UI={tab:"home",tipo:"gasto",catSel:"",mes:mesAtual()};
+let statExp=null; // {type:'cat'|'person', key:string}
 let DB_txs={},DB_wallets={},DB_orcs={},DB_cats={};
 let CH={},meuNome=localStorage.getItem("sw_nome")||"Eu";
 let selEmoji="🏠",selColor=COLORS[0];
@@ -424,7 +438,8 @@ function renderStats(){
   h+=`<div class="summary"><div class="scard"><div class="scard-lbl">📈 Receitas</div><div class="scard-val" style="color:#2dc76d">${fmt(rec)}</div></div><div class="scard"><div class="scard-lbl">📉 Gastos</div><div class="scard-val" style="color:#f0483e">${fmt(totalG)}</div></div><div class="scard"><div class="scard-lbl">💰 Saldo</div><div class="scard-val" style="color:${sal>=0?"#2dc76d":"#f0483e"}">${fmt(sal)}</div></div><div class="scard"><div class="scard-lbl">🔖 Lançamentos</div><div class="scard-val" style="color:#9b7fd4">${txs.length}</div></div></div>`;
   if(Object.keys(byPerson).length>1){
     h+=`<div class="sec"><span class="sec-title">👥 Gastos por pessoa</span></div>`;
-    Object.entries(byPerson).sort((a,b)=>b[1]-a[1]).forEach(([nome,val])=>{const pct=totalG>0?((val/totalG)*100).toFixed(0):0;h+=`<div class="catstat"><div class="txico" style="background:#7b5ea722;width:38px;height:38px;border-radius:12px;font-size:17px;flex-shrink:0">👤</div><div class="catstat-bars"><div class="catstat-top"><span class="catstat-name">${nome}</span><span class="catstat-val">${fmt(val)}</span></div><div class="catstat-bar"><div class="catstat-fill" style="width:${pct}%;background:#7b5ea7"></div></div><div class="catstat-pct">${pct}% do total</div></div></div>`;});
+    Object.entries(byPerson).sort((a,b)=>b[1]-a[1]).forEach(([nome,val])=>{const pct=totalG>0?((val/totalG)*100).toFixed(0):0;const isOpen=statExp&&statExp.type==="person"&&statExp.key===nome;const nomeSafe=nome.replace(/'/g,"\\'");
+      h+=`<div class="catstat-wrap"><div class="catstat" onclick="toggleStatDetail('person','${nomeSafe}')"><div class="txico" style="background:#7b5ea722;width:38px;height:38px;border-radius:12px;font-size:17px;flex-shrink:0">👤</div><div class="catstat-bars"><div class="catstat-top"><span class="catstat-name">${nome}</span><span class="catstat-val">${fmt(val)}</span></div><div class="catstat-bar"><div class="catstat-fill" style="width:${pct}%;background:#7b5ea7"></div></div><div class="catstat-pct">${pct}% do total</div></div><span class="catstat-chev${isOpen?" open":""}">▼</span></div><div class="catstat-detail${isOpen?" open":""}">${isOpen?statDetailHtml(gas.filter(t=>t.quem===nome)):""}</div></div>`;});
   }
   if(sorted.length){
     const allGastos=gas;
@@ -437,8 +452,20 @@ function renderStats(){
   }
   h+=`<div class="sec"><span class="sec-title">Detalhamento</span></div>`;
   if(!sorted.length) return h+`<div class="empty"><div class="empty-ico">📊</div><div class="empty-txt">Sem gastos neste período.</div></div>`;
-  sorted.forEach(([nome,val])=>{const cat=byCatMeta[nome],pct=totalG>0?((val/totalG)*100).toFixed(1):0;h+=`<div class="catstat"><div class="txico" style="background:${cat.c}22;width:38px;height:38px;border-radius:12px;font-size:17px;flex-shrink:0">${cat.ico}</div><div class="catstat-bars"><div class="catstat-top"><span class="catstat-name">${cat.n}</span><span class="catstat-val">${fmt(val)}</span></div><div class="catstat-bar"><div class="catstat-fill" style="width:${pct}%;background:${cat.c}"></div></div><div class="catstat-pct">${pct}% do total</div></div></div>`;});
+  sorted.forEach(([nome,val])=>{const cat=byCatMeta[nome],pct=totalG>0?((val/totalG)*100).toFixed(1):0;const isOpen=statExp&&statExp.type==="cat"&&statExp.key===nome;const nomeSafe=nome.replace(/'/g,"\\'");
+    h+=`<div class="catstat-wrap"><div class="catstat" onclick="toggleStatDetail('cat','${nomeSafe}')"><div class="txico" style="background:${cat.c}22;width:38px;height:38px;border-radius:12px;font-size:17px;flex-shrink:0">${cat.ico}</div><div class="catstat-bars"><div class="catstat-top"><span class="catstat-name">${cat.n}</span><span class="catstat-val">${fmt(val)}</span></div><div class="catstat-bar"><div class="catstat-fill" style="width:${pct}%;background:${cat.c}"></div></div><div class="catstat-pct">${pct}% do total</div></div><span class="catstat-chev${isOpen?" open":""}">▼</span></div><div class="catstat-detail${isOpen?" open":""}">${isOpen?statDetailHtml(gas.filter(t=>getCat(t.cat).n===nome)):""}</div></div>`;});
   return h;
+}
+
+function statDetailHtml(items){
+  if(!items.length) return `<div class="catdet-empty">Nenhuma despesa encontrada.</div>`;
+  const sorted=[...items].sort((a,b)=>(b.d||"").localeCompare(a.d||"")||(b.ts||0)-(a.ts||0));
+  return `<div class="catstat-detail-inner">`+sorted.map(t=>`<div class="catdet-item"><div class="catdet-info"><div class="catdet-name">${t.desc||"(sem descrição)"}</div><div class="catdet-date">${fmtDate(t.d)}${t.note?" · "+t.note:""}</div></div><div class="catdet-val">-${fmt(t.v)}</div></div>`).join("")+`</div>`;
+}
+function toggleStatDetail(type,key){
+  if(statExp&&statExp.type===type&&statExp.key===key) statExp=null;
+  else statExp={type,key};
+  render();
 }
 
 // ── CONFIG ──
