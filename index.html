@@ -198,7 +198,6 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <div class="navtabs">
       <button class="ntab on" data-tab="home" onclick="goTab('home')"><span class="ni">🏠</span>INÍCIO</button>
       <button class="ntab" data-tab="txs" onclick="goTab('txs')"><span class="ni">📋</span>LANÇAMENTOS</button>
-      <button class="ntab" data-tab="budgets" onclick="goTab('budgets')"><span class="ni">🎯</span>ORÇAMENTOS</button>
       <button class="ntab" data-tab="stats" onclick="goTab('stats')"><span class="ni">📊</span>ANÁLISE</button>
     </div>
   </div>
@@ -210,7 +209,6 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <button class="bnbtn on" id="bn-home" onclick="goTab('home')"><span class="bnico">🏠</span>INÍCIO</button>
     <button class="bnbtn" id="bn-txs" onclick="goTab('txs')"><span class="bnico">📋</span>LANÇAMENTOS</button>
     <div style="flex:1.2"></div>
-    <button class="bnbtn" id="bn-budgets" onclick="goTab('budgets')"><span class="bnico">🎯</span>ORÇAMENTOS</button>
     <button class="bnbtn" id="bn-stats" onclick="goTab('stats')"><span class="bnico">📊</span>ANÁLISE</button>
   </div>
 
@@ -228,10 +226,7 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <div class="fg"><label class="flabel">Descrição</label>
       <input class="finput" type="text" id="f-desc" placeholder="Ex: Almoço, Salário..."/>
     </div>
-    <div class="frow">
-      <div><label class="flabel">Data</label><input class="finput" type="date" id="f-data"/></div>
-      <div><label class="flabel">Carteira</label><select class="fselect" id="f-wallet"></select></div>
-    </div>
+    <div class="fg"><label class="flabel">Data</label><input class="finput" type="date" id="f-data"/></div>
     <div id="f-cat-sec"><label class="flabel">Categoria</label>
       <div class="catgrid" id="catgrid"></div>
     </div>
@@ -255,17 +250,6 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <button class="sbtn" onclick="saveWallet()">Criar Carteira</button>
   </div></div>
 
-  <!-- MODAL ORC -->
-  <div class="overlay" id="ov-orc"><div class="modal">
-    <div class="mhandle"></div>
-    <div class="mtitle">Novo Orçamento <button class="mclose" onclick="closeOv('orc')">✕</button></div>
-    <div class="fg"><label class="flabel">Categoria</label><select class="fselect" id="o-cat"></select></div>
-    <div class="fg"><label class="flabel">Limite mensal (R$)</label>
-      <input class="finput" type="number" id="o-lim" placeholder="0,00" step="0.01"/>
-    </div>
-    <button class="sbtn" onclick="saveOrc()">Salvar Orçamento</button>
-  </div></div>
-
   <!-- MODAL EDITAR TX -->
   <div class="overlay" id="ov-edittx"><div class="modal">
     <div class="mhandle"></div>
@@ -280,10 +264,7 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <div class="fg"><label class="flabel">Descrição</label>
       <input class="finput" type="text" id="ef-desc" placeholder="Ex: Almoço, Salário..."/>
     </div>
-    <div class="frow">
-      <div><label class="flabel">Data</label><input class="finput" type="date" id="ef-data"/></div>
-      <div><label class="flabel">Carteira</label><select class="fselect" id="ef-wallet"></select></div>
-    </div>
+    <div class="fg"><label class="flabel">Data</label><input class="finput" type="date" id="ef-data"/></div>
     <div id="ef-cat-sec"><label class="flabel">Categoria</label>
       <div class="catgrid" id="editcatgrid"></div>
     </div>
@@ -334,7 +315,7 @@ const GRADS=[["#2dc76d","#00c9a7"],["#7b5ea7","#e91e8c"],["#f97316","#fbbf24"],[
 
 let UI={tab:"home",tipo:"gasto",catSel:"",mes:mesAtual()};
 let statExp=null; // {type:'cat'|'person', key:string}
-let DB_txs={},DB_wallets={},DB_orcs={},DB_cats={};
+let DB_txs={},DB_wallets={},DB_cats={};
 let CH={},meuNome=localStorage.getItem("sw_nome")||"Eu";
 let selEmoji="🏠",selColor=COLORS[0];
 function catsArr(){
@@ -350,7 +331,6 @@ function fmtDate(d){return d?d.split("-").reverse().join("/"):""}
 function labelMes(m){if(!m)return"";const[a,mo]=m.split("-");return new Date(a,mo-1,1).toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}
 function txsArr(){return Object.entries(DB_txs).map(([k,v])=>({...v,_key:k}))}
 function walletsArr(){return Object.entries(DB_wallets).map(([k,v])=>({...v,_key:k}))}
-function orcsArr(){return Object.entries(DB_orcs).map(([k,v])=>({...v,_key:k}))}
 function txsMes(m){return txsArr().filter(t=>t.d&&t.d.startsWith(m||UI.mes))}
 function saldoW(w){return(+w.saldo||0)+txsArr().filter(t=>t.wid===w._key).reduce((s,t)=>s+(t.tipo==="receita"?+t.v:-(+t.v)),0)}
 function promptNome(){const n=prompt("Seu nome:",meuNome);if(n&&n.trim()){meuNome=n.trim();;localStorage.setItem("sw_nome",meuNome);document.getElementById("tb-avatar").textContent=meuNome.slice(0,2).toUpperCase()}}
@@ -360,7 +340,6 @@ function initFirebase(){
   const dot=document.getElementById("syncdot");
   onValue(ref(db,"wallets"),snap=>{DB_wallets=snap.val()||{};if(!Object.keys(DB_wallets).length)window._push(ref(db,"wallets"),{nome:"Carteira Conjunta",saldo:0,gi:0});render()});
   onValue(ref(db,"txs"),snap=>{DB_txs=snap.val()||{};dot.className="sync-dot ok";render()},()=>{dot.className="sync-dot err"});
-  onValue(ref(db,"orcs"),snap=>{DB_orcs=snap.val()||{};render()});
   onValue(ref(db,"cats"),snap=>{DB_cats=snap.val()||{};render()});
   document.getElementById("loader").style.display="none";
 }
@@ -373,14 +352,13 @@ function render(){
   const c=document.getElementById("content");
   if(UI.tab==="home") c.innerHTML=renderHome();
   else if(UI.tab==="txs") c.innerHTML=renderTxs();
-  else if(UI.tab==="budgets") c.innerHTML=renderBudgets();
   else if(UI.tab==="stats") c.innerHTML=renderStats();
   else if(UI.tab==="config") c.innerHTML=renderConfig();
   document.querySelectorAll(".ntab").forEach(b=>b.classList.toggle("on",b.dataset.tab===UI.tab));
-  ["home","txs","budgets","stats"].forEach(t=>{const b=document.getElementById("bn-"+t);if(b)b.classList.toggle("on",t===UI.tab)});
+  ["home","txs","stats"].forEach(t=>{const b=document.getElementById("bn-"+t);if(b)b.classList.toggle("on",t===UI.tab)});
   document.getElementById("tb-avatar").textContent=meuNome.slice(0,2).toUpperCase();
   if(!UI.catSel&&catsArr().length) UI.catSel=catsArr()[0]._key||catsArr()[0].id;
-  fillCatGrid();fillWalletSel();fillOrcSel();
+  fillCatGrid();
   requestAnimationFrame(()=>{if(UI.tab==="home")buildLine();if(UI.tab==="stats")buildPie()});
 }
 
@@ -412,19 +390,6 @@ function renderTxs(){
     h+=`<div class="txlist" style="margin-bottom:6px">`+items.map(t=>{const cat=getCat(t.tipo==="gasto"?t.cat:"outros");const w=walletsArr().find(x=>x._key===t.wid);
       return`<div class="txitem"><div class="txico" style="background:${cat.c}22">${cat.ico}</div><div class="txinfo"><div class="txname">${t.desc||""}</div><div class="txsub">${cat.n}${w?" · "+w.nome:""}${t.note?" · "+t.note:""}</div>${t.quem?`<span class="txwho">👤 ${t.quem}</span>`:""}</div><div style="text-align:right"><div class="txval" style="color:${t.tipo==="receita"?"#2dc76d":"#f0483e"}">${t.tipo==="receita"?"+":"-"}${fmt(t.v)}</div><div style="display:flex;gap:2px;justify-content:flex-end;margin-top:3px"><button class="delbtn" onclick="editTx('${t._key}')" style="color:var(--text2)">✏️</button><button class="delbtn" onclick="delTx('${t._key}')">🗑</button></div></div></div>`;
     }).join("")+`</div>`;
-  });
-  return h;
-}
-
-// ── BUDGETS ──
-function renderBudgets(){
-  const txs=txsMes();
-  let h=`<div class="sec"><span class="sec-title">Orçamentos · ${labelMes(UI.mes)}</span><button class="add-orc-btn" onclick="openOv('orc')">+ Novo</button></div>`;
-  const orcs=orcsArr();
-  if(!orcs.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido.</div></div>`;
-  const[ano,mes]=UI.mes.split("-").map(Number),dim=new Date(ano,mes,0).getDate(),today=new Date(),dp=today.getFullYear()===ano&&today.getMonth()+1===mes?today.getDate():dim,dl=Math.max(0,dim-dp);
-  orcs.forEach(o=>{const cat=getCat(o.cat),spent=txs.filter(t=>t.tipo==="gasto"&&t.cat===o.cat).reduce((s,t)=>s+(+t.v),0),pct=Math.min(100,Math.round(spent/(+o.lim)*100)),left=Math.max(0,+o.lim-spent),daily=dl>0?(left/dl):0,bc=pct>90?"#f0483e":pct>65?"#fbbf24":"#2dc76d";
-    h+=`<div class="bcard"><div class="bcard-row"><div class="bcard-left"><div class="bico" style="background:${cat.c}22">${cat.ico}</div><div><div class="bname">${cat.n}</div><div class="bsub">${fmt(spent)} de ${fmt(o.lim)}</div></div></div><div style="text-align:right"><div class="bpct" style="color:${bc}">${pct}%</div><button class="delbtn" onclick="delOrc('${o._key}')">🗑</button></div></div><div class="prog"><div class="prog-fill" style="width:${pct}%;background:${bc}"></div></div><div class="prog-days">Restam ${fmt(left)} · ${fmt(daily)}/dia · ${dl} dias</div></div>`;
   });
   return h;
 }
@@ -557,14 +522,11 @@ function fillCatGrid(){
   if(!UI.catSel) UI.catSel=cats[0]?._key||cats[0]?.id||"";
   el.innerHTML=cats.map(c=>{const k=c._key||c.id;return`<button class="catbtn${UI.catSel===k?" on":""}" onclick="selCat('${k}')"><span class="catbtn-ico">${c.ico}</span>${c.n}</button>`}).join("");
 }
-function fillWalletSel(){const fw=document.getElementById("f-wallet");if(!fw)return;fw.innerHTML=walletsArr().map(w=>`<option value="${w._key}">${w.nome}</option>`).join("")}
-function fillOrcSel(){const el=document.getElementById("o-cat");if(!el)return;el.innerHTML=catsArr().map(c=>`<option value="${c._key||c.id}">${c.ico} ${c.n}</option>`).join("")}
 
 function openOv(id){
   document.getElementById("ov-"+id).classList.add("open");
-  if(id==="tx"){document.getElementById("f-data").value=hoje();setTipo(UI.tipo);fillCatGrid();fillWalletSel()}
+  if(id==="tx"){document.getElementById("f-data").value=hoje();setTipo(UI.tipo);fillCatGrid()}
   if(id==="wallet"){const wc=document.getElementById("wcolors");if(wc)wc.innerHTML=GRADS.map((g,i)=>`<div class="wcolor${i===0?" on":""}" style="background:linear-gradient(135deg,${g[0]},${g[1]})" onclick="selWG(${i})" data-i="${i}"></div>`).join("")}
-  if(id==="orc")fillOrcSel();
 }
 function closeOv(id){document.getElementById("ov-"+id).classList.remove("open")}
 function setTipo(t){UI.tipo=t;document.getElementById("tt-gasto").className="ttbtn"+(t==="gasto"?" on-g":"");document.getElementById("tt-receita").className="ttbtn"+(t==="receita"?" on-r":"");const cs=document.getElementById("f-cat-sec");if(cs)cs.style.display=t==="gasto"?"block":"none"}
@@ -572,7 +534,7 @@ function selCat(id){UI.catSel=id;fillCatGrid()}
 function selWG(i){document.querySelectorAll(".wcolor").forEach(e=>e.classList.toggle("on",+e.dataset.i===i))}
 
 function saveTx(){
-  const v=parseFloat(document.getElementById("f-val").value),desc=document.getElementById("f-desc").value.trim(),d=document.getElementById("f-data").value,wid=document.getElementById("f-wallet").value,note=document.getElementById("f-note").value.trim();
+  const v=parseFloat(document.getElementById("f-val").value),desc=document.getElementById("f-desc").value.trim(),d=document.getElementById("f-data").value,wid=walletsArr()[0]?._key||"",note=document.getElementById("f-note").value.trim();
   if(!v||v<=0){alert("Informe o valor.");return}if(!desc){alert("Informe a descrição.");return}if(!d){alert("Informe a data.");return}
   const data={tipo:UI.tipo,v,desc,d,cat:UI.tipo==="gasto"?UI.catSel:"outros",wid,quem:meuNome,ts:Date.now()};
   if(note)data.note=note;
@@ -583,12 +545,6 @@ function saveWallet(){
   const nome=document.getElementById("w-nome").value.trim(),saldo=parseFloat(document.getElementById("w-saldo").value)||0,gi=[...document.querySelectorAll(".wcolor")].findIndex(e=>e.classList.contains("on"));
   if(!nome){alert("Informe o nome.");return}
   window._push(window._ref(window._db,"wallets"),{nome,saldo,gi:gi>=0?gi:0});closeOv("wallet");document.getElementById("w-nome").value="";document.getElementById("w-saldo").value="";
-}
-function saveOrc(){
-  const cat=document.getElementById("o-cat").value,lim=parseFloat(document.getElementById("o-lim").value);
-  if(!lim||lim<=0){alert("Informe o limite.");return}
-  const ex=orcsArr().find(o=>o.cat===cat);if(ex)window._remove(window._ref(window._db,"orcs/"+ex._key));
-  window._push(window._ref(window._db,"orcs"),{cat,lim});closeOv("orc");document.getElementById("o-lim").value="";
 }
 function delTx(key){if(confirm("Remover esta transação?"))window._remove(window._ref(window._db,"txs/"+key))}
 
@@ -602,9 +558,6 @@ function editTx(key){
   document.getElementById("ef-desc").value=t.desc||"";
   document.getElementById("ef-data").value=t.d||"";
   document.getElementById("ef-note").value=t.note||"";
-  // wallet
-  const fw=document.getElementById("ef-wallet");
-  fw.innerHTML=walletsArr().map(w=>`<option value="${w._key}"${w._key===t.wid?" selected":""}>${w.nome}</option>`).join("");
   // tipo toggle
   setEditTipo(editTipoAtual);
   // cat grid
@@ -629,18 +582,17 @@ function updateTx(){
   const v=parseFloat(document.getElementById("ef-val").value);
   const desc=document.getElementById("ef-desc").value.trim();
   const d=document.getElementById("ef-data").value;
-  const wid=document.getElementById("ef-wallet").value;
   const note=document.getElementById("ef-note").value.trim();
   if(!v||v<=0){alert("Informe o valor.");return}
   if(!desc){alert("Informe a descrição.");return}
   if(!d){alert("Informe a data.");return}
   const orig=DB_txs[key];
+  const wid=orig?.wid||walletsArr()[0]?._key||"";
   const data={tipo:editTipoAtual,v,desc,d,cat:editTipoAtual==="gasto"?editCatSel:"outros",wid,quem:orig?.quem||meuNome,ts:orig?.ts||Date.now()};
   if(note)data.note=note;
   window._set(window._ref(window._db,"txs/"+key),data);
   closeOv('edittx');
 }
-function delOrc(key){if(confirm("Remover orçamento?"))window._remove(window._ref(window._db,"orcs/"+key))}
 function goTab(t){UI.tab=t;render();document.getElementById("scroll").scrollTop=0}
 function moveMes(d){const[a,m]=UI.mes.split("-").map(Number),nd=new Date(a,m-1+d,1);UI.mes=nd.getFullYear()+"-"+String(nd.getMonth()+1).padStart(2,"0");render()}
 document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("open")}));
