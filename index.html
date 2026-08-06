@@ -166,9 +166,9 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* CATEGORIAS MANAGER */
-.cat-manage-item{background:var(--card);border-radius:var(--rs);padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid var(--border);margin-bottom:7px;touch-action:pan-y}
+.cat-manage-item{background:var(--card);border-radius:var(--rs);padding:12px 8px 12px 14px;display:flex;align-items:center;gap:8px;border:1px solid var(--border);margin-bottom:7px;touch-action:pan-y}
 .cat-manage-item.dragging{opacity:.85;box-shadow:0 8px 24px rgba(0,0,0,.5);border-color:var(--green);z-index:60;position:relative;transition:none}
-.cat-drag-handle{font-size:17px;color:var(--text3);cursor:grab;touch-action:none;padding:4px 2px 4px 0;flex-shrink:0;user-select:none;line-height:1}
+.cat-drag-handle{font-size:19px;color:var(--text3);cursor:grab;touch-action:none;width:38px;height:38px;flex-shrink:0;user-select:none;display:flex;align-items:center;justify-content:center;-webkit-user-select:none;-webkit-touch-callout:none}
 .cat-drag-handle:active{cursor:grabbing;color:var(--green)}
 .cat-drag-handle.disabled{opacity:.25;cursor:default}
 .cat-manage-ico{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
@@ -502,23 +502,27 @@ function delCat(key){
 // ── REORDENAR CATEGORIAS (drag & drop) ──
 let dragCtx=null;
 function catDragStart(ev){
+  if(dragCtx) return; // já existe um drag em andamento (evita multi-touch conflitante)
   ev.preventDefault();
+  ev.stopPropagation();
   const handle=ev.currentTarget;
   const item=handle.closest(".cat-manage-item");
   const container=document.getElementById("cat-list");
   if(!item||!container) return;
   const items=[...container.querySelectorAll(".cat-manage-item")];
-  if(items.length<2){return}
+  if(items.length<2) return;
   const gap=items.length>1?Math.abs(items[1].offsetTop-items[0].offsetTop):item.offsetHeight+7;
-  dragCtx={item,container,startY:ev.clientY,height:gap};
+  const scrollEl=document.getElementById("scroll");
+  dragCtx={item,container,startY:ev.clientY,height:gap,pointerId:ev.pointerId,scrollEl,prevOverflow:scrollEl?scrollEl.style.overflowY:""};
   item.classList.add("dragging");
+  if(scrollEl) scrollEl.style.overflowY="hidden";
   try{handle.setPointerCapture(ev.pointerId);}catch(e){}
-  document.addEventListener("pointermove",catDragMove);
+  document.addEventListener("pointermove",catDragMove,{passive:false});
   document.addEventListener("pointerup",catDragEnd);
   document.addEventListener("pointercancel",catDragEnd);
 }
 function catDragMove(ev){
-  if(!dragCtx) return;
+  if(!dragCtx||ev.pointerId!==dragCtx.pointerId) return;
   ev.preventDefault();
   let dy=ev.clientY-dragCtx.startY;
   dragCtx.item.style.transform=`translateY(${dy}px)`;
@@ -546,10 +550,11 @@ function catDragMove(ev){
     }
   }
 }
-function catDragEnd(){
-  if(!dragCtx) return;
+function catDragEnd(ev){
+  if(!dragCtx||(ev&&ev.pointerId!==undefined&&ev.pointerId!==dragCtx.pointerId)) return;
   dragCtx.item.style.transform="";
   dragCtx.item.classList.remove("dragging");
+  if(dragCtx.scrollEl) dragCtx.scrollEl.style.overflowY=dragCtx.prevOverflow||"";
   document.removeEventListener("pointermove",catDragMove);
   document.removeEventListener("pointerup",catDragEnd);
   document.removeEventListener("pointercancel",catDragEnd);
