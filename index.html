@@ -166,7 +166,11 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* CATEGORIAS MANAGER */
-.cat-manage-item{background:var(--card);border-radius:var(--rs);padding:12px 14px;display:flex;align-items:center;gap:12px;border:1px solid var(--border);margin-bottom:7px}
+.cat-manage-item{background:var(--card);border-radius:var(--rs);padding:12px 14px;display:flex;align-items:center;gap:10px;border:1px solid var(--border);margin-bottom:7px;touch-action:pan-y}
+.cat-manage-item.dragging{opacity:.85;box-shadow:0 8px 24px rgba(0,0,0,.5);border-color:var(--green);z-index:60;position:relative;transition:none}
+.cat-drag-handle{font-size:17px;color:var(--text3);cursor:grab;touch-action:none;padding:4px 2px 4px 0;flex-shrink:0;user-select:none;line-height:1}
+.cat-drag-handle:active{cursor:grabbing;color:var(--green)}
+.cat-drag-handle.disabled{opacity:.25;cursor:default}
 .cat-manage-ico{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
 .cat-manage-info{flex:1}
 .cat-manage-name{font-size:13px;font-weight:700}
@@ -319,9 +323,9 @@ let DB_txs={},DB_wallets={},DB_cats={};
 let CH={},meuNome=localStorage.getItem("sw_nome")||"Eu";
 let selEmoji="🏠",selColor=COLORS[0];
 function catsArr(){
-  const db=Object.entries(DB_cats).map(([k,v])=>({...v,_key:k
-}));
-  return db.length?db:DEFAULT_CATS;
+  const db=Object.entries(DB_cats).map(([k,v])=>({...v,_key:k}));
+  const list=db.length?db:DEFAULT_CATS;
+  return [...list].sort((a,b)=>(a.ordem??9999)-(b.ordem??9999));
 }
 function getCat(id){return catsArr().find(c=>c.id===id||c._key===id)||{n:"Outros",ico:"💡",c:"#7C5CBF"}}
 function mesAtual(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
@@ -438,15 +442,18 @@ function toggleStatDetail(type,key){
 function renderConfig(){
   const cats=catsArr();
   let h=`<div class="sec"><span class="sec-title">⚙️ Categorias</span><button class="add-orc-btn" onclick="openCatModal()">+ Nova</button></div>
-  <div style="font-size:11px;color:var(--text3);margin-bottom:14px;font-weight:500">Toque no lápis para editar ou na lixeira para excluir.</div>`;
-  h+=cats.map(c=>`<div class="cat-manage-item">
+  <div style="font-size:11px;color:var(--text3);margin-bottom:14px;font-weight:500">Segure o ⠿ e arraste para reordenar. Toque no lápis para editar ou na lixeira para excluir.</div>
+  <div id="cat-list">`;
+  h+=cats.map(c=>{const k=c._key||c.id;const draggable=!!c._key;return`<div class="cat-manage-item" data-catkey="${draggable?k:''}">
+    <div class="cat-drag-handle${draggable?"":" disabled"}"${draggable?` onpointerdown="catDragStart(event)"`:""}>⠿</div>
     <div class="cat-manage-ico" style="background:${c.c}22">${c.ico}</div>
     <div class="cat-manage-info"><div class="cat-manage-name">${c.n}</div></div>
     <div class="cat-manage-actions">
-      <button class="edit-btn" onclick="openCatModal('${c._key||c.id}','${c.n}','${c.ico}','${c.c}')">✏️</button>
-      <button class="edit-btn" style="color:#f0483e" onclick="delCat('${c._key||c.id}')">🗑</button>
+      <button class="edit-btn" onclick="openCatModal('${k}','${c.n}','${c.ico}','${c.c}')">✏️</button>
+      <button class="edit-btn" style="color:#f0483e" onclick="delCat('${k}')">🗑</button>
     </div>
-  </div>`).join("");
+  </div>`;}).join("");
+  h+=`</div>`;
   h+=`<div style="margin-top:20px">
     <div class="sec"><span class="sec-title">👤 Meu perfil</span></div>
     <div class="cat-manage-item">
@@ -490,6 +497,72 @@ function delCat(key){
   // só remove do Firebase se tiver key real (não default)
   if(key&&key.length>10) window._remove(window._ref(window._db,"cats/"+key));
   else alert("Categorias padrão não podem ser excluídas pelo app. Adicione novas e deixe de usar as antigas.");
+}
+
+// ── REORDENAR CATEGORIAS (drag & drop) ──
+let dragCtx=null;
+function catDragStart(ev){
+  ev.preventDefault();
+  const handle=ev.currentTarget;
+  const item=handle.closest(".cat-manage-item");
+  const container=document.getElementById("cat-list");
+  if(!item||!container) return;
+  const items=[...container.querySelectorAll(".cat-manage-item")];
+  if(items.length<2){return}
+  const gap=items.length>1?Math.abs(items[1].offsetTop-items[0].offsetTop):item.offsetHeight+7;
+  dragCtx={item,container,startY:ev.clientY,height:gap};
+  item.classList.add("dragging");
+  try{handle.setPointerCapture(ev.pointerId);}catch(e){}
+  document.addEventListener("pointermove",catDragMove);
+  document.addEventListener("pointerup",catDragEnd);
+  document.addEventListener("pointercancel",catDragEnd);
+}
+function catDragMove(ev){
+  if(!dragCtx) return;
+  ev.preventDefault();
+  let dy=ev.clientY-dragCtx.startY;
+  dragCtx.item.style.transform=`translateY(${dy}px)`;
+  const items=[...dragCtx.container.querySelectorAll(".cat-manage-item")];
+  const idx=items.indexOf(dragCtx.item);
+  const draggedRect=dragCtx.item.getBoundingClientRect();
+  const draggedCenter=draggedRect.top+draggedRect.height/2;
+  if(idx<items.length-1){
+    const next=items[idx+1],r=next.getBoundingClientRect();
+    if(draggedCenter>r.top+r.height/2){
+      dragCtx.container.insertBefore(next,dragCtx.item);
+      dragCtx.startY+=dragCtx.height;
+      dy=ev.clientY-dragCtx.startY;
+      dragCtx.item.style.transform=`translateY(${dy}px)`;
+      return;
+    }
+  }
+  if(idx>0){
+    const prev=items[idx-1],r=prev.getBoundingClientRect();
+    if(draggedCenter<r.top+r.height/2){
+      dragCtx.container.insertBefore(dragCtx.item,prev);
+      dragCtx.startY-=dragCtx.height;
+      dy=ev.clientY-dragCtx.startY;
+      dragCtx.item.style.transform=`translateY(${dy}px)`;
+    }
+  }
+}
+function catDragEnd(){
+  if(!dragCtx) return;
+  dragCtx.item.style.transform="";
+  dragCtx.item.classList.remove("dragging");
+  document.removeEventListener("pointermove",catDragMove);
+  document.removeEventListener("pointerup",catDragEnd);
+  document.removeEventListener("pointercancel",catDragEnd);
+  const items=[...dragCtx.container.querySelectorAll(".cat-manage-item")];
+  items.forEach((el,i)=>{
+    const k=el.dataset.catkey;
+    if(k&&DB_cats[k]){
+      DB_cats[k]={...DB_cats[k],ordem:i};
+      window._set(window._ref(window._db,"cats/"+k),DB_cats[k]);
+    }
+  });
+  dragCtx=null;
+  render();
 }
 
 function periodHdr(){return`<div class="period-row"><button class="parrow" onclick="moveMes(-1)">‹</button><span class="plabel">${labelMes(UI.mes)}</span><button class="parrow" onclick="moveMes(1)">›</button></div>`}
