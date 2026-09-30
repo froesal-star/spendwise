@@ -278,6 +278,15 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <button class="sbtn" onclick="saveOrc()">Salvar Orçamento</button>
   </div></div>
 
+  <!-- MODAL ESCOPO DA EDIÇÃO DE ORÇAMENTO RECORRENTE -->
+  <div class="overlay" id="ov-orcscope"><div class="modal">
+    <div class="mhandle"></div>
+    <div class="mtitle">Aplicar alteração <button class="mclose" onclick="closeOv('orcscope')">✕</button></div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:18px" id="orcscope-msg"></div>
+    <button class="sbtn" style="margin-bottom:10px" onclick="confirmOrcScope(false)">📅 Aplicar somente neste mês</button>
+    <button class="sbtn" style="background:var(--bg3);color:var(--text);box-shadow:none;border:1.5px solid var(--border)" onclick="confirmOrcScope(true)">🔁 Aplicar nos próximos meses também</button>
+  </div></div>
+
   <!-- MODAL EDITAR TX -->
   <div class="overlay" id="ov-edittx"><div class="modal">
     <div class="mhandle"></div>
@@ -439,6 +448,13 @@ function orcVigenciaLabel(o){
   if(o.tipo==="recorrente") return `🔁 ${(o.meses||[]).slice().sort((a,b)=>a-b).map(m=>MESES_NOMES[m-1]).join(", ")}`;
   return "🔁 Todos os meses";
 }
+function orcsDoMes(mesStr){
+  // aplica a vigência de cada orçamento e, quando uma categoria tem um orçamento
+  // "único" para este mês além de um "recorrente" que também o cobre, prioriza o único
+  const list=orcsArr().filter(o=>orcAplicavel(o,mesStr));
+  const catsUnico=new Set(list.filter(o=>o.tipo==="unico").map(o=>o.cat));
+  return list.filter(o=>!(o.tipo==="recorrente"&&catsUnico.has(o.cat)));
+}
 function ultimosMeses(mesStr,n){
   const[y,m]=mesStr.split("-").map(Number),arr=[];
   for(let i=n-1;i>=0;i--){const d=new Date(y,m-1-i,1);arr.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"))}
@@ -451,7 +467,7 @@ function sugestoesOrcamento(){
     porCatPorMes[t.cat]=porCatPorMes[t.cat]||{};
     porCatPorMes[t.cat][m]=(porCatPorMes[t.cat][m]||0)+(+t.v);
   })});
-  const jaOrcado=new Set(orcsArr().filter(o=>orcAplicavel(o,UI.mes)).map(o=>o.cat));
+  const jaOrcado=new Set(orcsDoMes(UI.mes).map(o=>o.cat));
   return Object.entries(porCatPorMes).map(([cat,porMes])=>{
     const valores=Object.values(porMes); // só meses em que houve gasto nessa categoria
     const total=valores.reduce((s,v)=>s+v,0);
@@ -462,7 +478,7 @@ function renderBudgets(){
   const txs=txsMes();
   let h=periodHdr();
   h+=`<div class="sec"><span class="sec-title">Orçamentos</span><button class="add-orc-btn" onclick="openOrcModal()">+ Novo</button></div>`;
-  const orcs=orcsArr().filter(o=>orcAplicavel(o,UI.mes));
+  const orcs=orcsDoMes(UI.mes);
   const sugestoes=sugestoesOrcamento();
   if(!orcs.length&&!sugestoes.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido para este mês.<br>Toque em <strong>+ Novo</strong> para criar um limite por categoria.</div></div>`;
   if(orcs.length){
@@ -745,13 +761,45 @@ function saveWallet(){
   if(!nome){alert("Informe o nome.");return}
   window._push(window._ref(window._db,"wallets"),{nome,saldo,gi:gi>=0?gi:0});closeOv("wallet");document.getElementById("w-nome").value="";document.getElementById("w-saldo").value="";
 }
+let orcScopePending=null;
 function saveOrc(){
   const cat=document.getElementById("o-cat").value,lim=parseFloat(document.getElementById("o-lim").value),key=document.getElementById("o-edit-key").value;
   if(!lim||lim<=0){alert("Informe o limite.");return}
   if(orcTipoAtual==="recorrente"&&!orcMesesSel.length){alert("Selecione ao menos um mês para repetir.");return}
+
+  // Editando um orçamento recorrente (vários meses) que também vale para o mês em exibição?
+  // Pergunta, com dois botões, se a alteração de valor deve valer para todos os meses ou só para este mês.
+  const orig=key?orcsArr().find(o=>o._key===key):null;
+  const mAtual=+UI.mes.split("-")[1];
+  const isEdicaoMultiMes=orig&&orig.tipo==="recorrente"&&orcTipoAtual==="recorrente"&&Array.isArray(orig.meses)&&orig.meses.length>1&&orig.meses.includes(mAtual)&&(+orig.lim)!==lim;
+  if(isEdicaoMultiMes){
+    const mesesTxt=orig.meses.slice().sort((a,b)=>a-b).map(m=>MESES_NOMES[m-1]).join(", ");
+    document.getElementById("orcscope-msg").innerHTML=`Esse orçamento se repete em <strong>${orig.meses.length} meses</strong> (${mesesTxt}).<br><br>Aplicar o novo valor <strong>${fmt(lim)}</strong> apenas em ${labelMes(UI.mes)}, ou nos próximos meses planejados também?`;
+    orcScopePending={cat,lim,key,orig,mAtual};
+    openOv("orcscope");
+    return;
+  }
+  finalizarSaveOrc(cat,lim,key);
+}
+function confirmOrcScope(aplicarTodos){
+  const{cat,lim,key,orig,mAtual}=orcScopePending;
+  closeOv("orcscope");
+  if(aplicarTodos){
+    finalizarSaveOrc(cat,lim,key);
+  } else {
+    const novosMeses=orig.meses.filter(m=>m!==mAtual);
+    if(novosMeses.length) window._set(window._ref(window._db,"orcs/"+key),{cat:orig.cat,lim:orig.lim,tipo:"recorrente",meses:novosMeses});
+    else window._remove(window._ref(window._db,"orcs/"+key));
+    window._push(window._ref(window._db,"orcs"),{cat,lim,tipo:"unico",mes:UI.mes});
+    closeOv("orc");document.getElementById("o-lim").value="";
+  }
+  orcScopePending=null;
+}
+function finalizarSaveOrc(cat,lim,key){
   const data={cat,lim,tipo:orcTipoAtual};
   if(orcTipoAtual==="unico") data.mes=UI.mes; else data.meses=orcMesesSel;
-  const ex=orcsArr().find(o=>o.cat===cat&&o._key!==key);
+  // remove duplicata só da MESMA categoria + MESMA vigência (nunca apaga orçamentos de outros meses)
+  const ex=orcsArr().find(o=>o.cat===cat&&o._key!==key&&o.tipo===orcTipoAtual&&(orcTipoAtual!=="unico"||o.mes===UI.mes));
   if(ex) window._remove(window._ref(window._db,"orcs/"+ex._key));
   if(key) window._set(window._ref(window._db,"orcs/"+key),data);
   else window._push(window._ref(window._db,"orcs"),data);
