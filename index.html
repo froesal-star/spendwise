@@ -460,7 +460,8 @@ function sugestoesOrcamento(){
 }
 function renderBudgets(){
   const txs=txsMes();
-  let h=`<div class="sec"><span class="sec-title">Orçamentos · ${labelMes(UI.mes)}</span><button class="add-orc-btn" onclick="openOrcModal()">+ Novo</button></div>`;
+  let h=periodHdr();
+  h+=`<div class="sec"><span class="sec-title">Orçamentos</span><button class="add-orc-btn" onclick="openOrcModal()">+ Novo</button></div>`;
   const orcs=orcsArr().filter(o=>orcAplicavel(o,UI.mes));
   const sugestoes=sugestoesOrcamento();
   if(!orcs.length&&!sugestoes.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido para este mês.<br>Toque em <strong>+ Novo</strong> para criar um limite por categoria.</div></div>`;
