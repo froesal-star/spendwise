@@ -439,11 +439,38 @@ function orcVigenciaLabel(o){
   if(o.tipo==="recorrente") return `🔁 ${(o.meses||[]).slice().sort((a,b)=>a-b).map(m=>MESES_NOMES[m-1]).join(", ")}`;
   return "🔁 Todos os meses";
 }
+function ultimosMeses(mesStr,n){
+  const[y,m]=mesStr.split("-").map(Number),arr=[];
+  for(let i=n-1;i>=0;i--){const d=new Date(y,m-1-i,1);arr.push(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"))}
+  return arr;
+}
+function sugestoesOrcamento(){
+  const JANELA=6;
+  const meses=ultimosMeses(UI.mes,JANELA),porCatPorMes={};
+  meses.forEach(m=>{txsArr().filter(t=>t.tipo==="gasto"&&t.d&&t.d.startsWith(m)).forEach(t=>{
+    porCatPorMes[t.cat]=porCatPorMes[t.cat]||{};
+    porCatPorMes[t.cat][m]=(porCatPorMes[t.cat][m]||0)+(+t.v);
+  })});
+  const jaOrcado=new Set(orcsArr().filter(o=>orcAplicavel(o,UI.mes)).map(o=>o.cat));
+  return Object.entries(porCatPorMes).map(([cat,porMes])=>{
+    const valores=Object.values(porMes); // só meses em que houve gasto nessa categoria
+    const total=valores.reduce((s,v)=>s+v,0);
+    return{cat,media:total/valores.length,mesesComGasto:valores.length,janela:JANELA};
+  }).filter(x=>!jaOrcado.has(x.cat)&&x.media>0).sort((a,b)=>b.media-a.media);
+}
 function renderBudgets(){
   const txs=txsMes();
   let h=`<div class="sec"><span class="sec-title">Orçamentos · ${labelMes(UI.mes)}</span><button class="add-orc-btn" onclick="openOrcModal()">+ Novo</button></div>`;
+  const sugestoes=sugestoesOrcamento();
+  if(sugestoes.length){
+    h+=`<div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600">💡 Sugestões com base na média de gastos dos últimos ${sugestoes[0].janela} meses (considerando apenas os meses em que houve gasto em cada categoria):</div>`;
+    h+=sugestoes.map(s=>{const cat=getCat(s.cat),sug=Math.ceil(s.media/10)*10;
+      return`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px"><div style="display:flex;align-items:center;gap:9px;min-width:0"><div class="bico" style="background:${cat.c}22;flex-shrink:0">${cat.ico}</div><div style="min-width:0"><div class="bname">${cat.n}</div><div class="bsub">Média: ${fmt(s.media)}/mês · ${s.mesesComGasto} de ${s.janela} meses</div></div></div><button class="add-orc-btn" style="flex-shrink:0" onclick="openOrcModal('','${s.cat}',${sug})">+ ${fmt(sug)}</button></div>`;
+    }).join("");
+  }
   const orcs=orcsArr().filter(o=>orcAplicavel(o,UI.mes));
-  if(!orcs.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido para este mês.<br>Toque em <strong>+ Novo</strong> para criar um limite por categoria.</div></div>`;
+  if(!orcs.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido para este mês.<br>Toque em <strong>+ Novo</strong> ou use uma sugestão acima.</div></div>`;
+  if(sugestoes.length) h+=`<div class="sec" style="margin-top:14px;margin-bottom:6px"><span class="sec-title" style="font-size:12px">Seus orçamentos</span></div>`;
   const[ano,mes]=UI.mes.split("-").map(Number),dim=new Date(ano,mes,0).getDate(),today=new Date(),dp=today.getFullYear()===ano&&today.getMonth()+1===mes?today.getDate():dim,dl=Math.max(0,dim-dp);
   const withSpend=orcs.map(o=>{const items=txs.filter(t=>t.tipo==="gasto"&&t.cat===o.cat);const spent=items.reduce((s,t)=>s+(+t.v),0);return{o,items,spent,rawPct:spent/(+o.lim||1)*100}});
   withSpend.sort((a,b)=>b.rawPct-a.rawPct); // quem está mais perto do limite aparece primeiro
@@ -675,13 +702,13 @@ function toggleOrcMes(m){
   orcMesesSel=orcMesesSel.includes(m)?orcMesesSel.filter(x=>x!==m):[...orcMesesSel,m].sort((a,b)=>a-b);
   fillMesesGrid();
 }
-function openOrcModal(key=""){
+function openOrcModal(key="",sugCat="",sugLim=""){
   const o=key?orcsArr().find(x=>x._key===key):null;
   document.getElementById("orc-modal-title").innerHTML=`${key?"Editar":"Novo"} Orçamento <button class="mclose" onclick="closeOv('orc')">✕</button>`;
   document.getElementById("o-edit-key").value=key;
   fillOrcSel();
-  document.getElementById("o-cat").value=o?.cat||(catsArr()[0]?._key||catsArr()[0]?.id||"");
-  document.getElementById("o-lim").value=o?.lim||"";
+  document.getElementById("o-cat").value=o?.cat||sugCat||(catsArr()[0]?._key||catsArr()[0]?.id||"");
+  document.getElementById("o-lim").value=o?.lim||sugLim||"";
   orcTipoAtual=o?.tipo||"unico";
   orcMesesSel=o?.meses?[...o.meses]:[];
   setOrcTipo(orcTipoAtual);
