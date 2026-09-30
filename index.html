@@ -202,6 +202,7 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <div class="navtabs">
       <button class="ntab on" data-tab="home" onclick="goTab('home')"><span class="ni">🏠</span>INÍCIO</button>
       <button class="ntab" data-tab="txs" onclick="goTab('txs')"><span class="ni">📋</span>LANÇAMENTOS</button>
+      <button class="ntab" data-tab="budgets" onclick="goTab('budgets')"><span class="ni">🎯</span>ORÇAMENTOS</button>
       <button class="ntab" data-tab="stats" onclick="goTab('stats')"><span class="ni">📊</span>ANÁLISE</button>
     </div>
   </div>
@@ -213,6 +214,7 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     <button class="bnbtn on" id="bn-home" onclick="goTab('home')"><span class="bnico">🏠</span>INÍCIO</button>
     <button class="bnbtn" id="bn-txs" onclick="goTab('txs')"><span class="bnico">📋</span>LANÇAMENTOS</button>
     <div style="flex:1.2"></div>
+    <button class="bnbtn" id="bn-budgets" onclick="goTab('budgets')"><span class="bnico">🎯</span>ORÇAMENTOS</button>
     <button class="bnbtn" id="bn-stats" onclick="goTab('stats')"><span class="bnico">📊</span>ANÁLISE</button>
   </div>
 
@@ -252,6 +254,28 @@ html,body{height:100%;background:var(--bg);margin:0;font-family:-apple-system,Bl
     </div>
     <div class="fg"><label class="flabel">Cor</label><div class="wcolors" id="wcolors"></div></div>
     <button class="sbtn" onclick="saveWallet()">Criar Carteira</button>
+  </div></div>
+
+  <!-- MODAL ORC -->
+  <div class="overlay" id="ov-orc"><div class="modal">
+    <div class="mhandle"></div>
+    <div class="mtitle" id="orc-modal-title">Novo Orçamento <button class="mclose" onclick="closeOv('orc')">✕</button></div>
+    <div class="fg"><label class="flabel">Categoria</label><select class="fselect" id="o-cat"></select></div>
+    <div class="fg"><label class="flabel">Limite mensal (R$)</label>
+      <input class="finput" type="number" id="o-lim" placeholder="0,00" step="0.01"/>
+    </div>
+    <div class="fg"><label class="flabel">Vigência</label>
+      <div class="ttoggle">
+        <button class="ttbtn on-r" id="o-tipo-unico" onclick="setOrcTipo('unico')">📅 Somente este mês</button>
+        <button class="ttbtn" id="o-tipo-rec" onclick="setOrcTipo('recorrente')">🔁 Repetir em meses</button>
+      </div>
+    </div>
+    <div class="fg" id="o-meses-sec" style="display:none">
+      <label class="flabel">Meses em que se repete</label>
+      <div class="catgrid" id="o-meses-grid" style="grid-template-columns:repeat(4,1fr)"></div>
+    </div>
+    <input type="hidden" id="o-edit-key"/>
+    <button class="sbtn" onclick="saveOrc()">Salvar Orçamento</button>
   </div></div>
 
   <!-- MODAL EDITAR TX -->
@@ -316,10 +340,12 @@ const DEFAULT_CATS=[
 const EMOJIS=["🏠","🛒","🚗","👦","👧","💊","💆","👗","⛽","🎒","✈️","🎉","💡","🍔","🍕","☕","🎮","📱","💻","🏋️","🐾","🐶","🌿","💈","🏥","🎓","📚","💼","💰","🎁","🛠️","🏖️","🎵","🚌","🚕","🛵","🧴","🧹","💧","➡","🌐","📦","🧸","🏊","🎨","🍷","🧃","🛍️"];
 const COLORS=["#EF4444","#F97316","#F59E0B","#fbbf24","#10B981","#2dc76d","#06B6D4","#3B82F6","#6366F1","#8B5CF6","#EC4899","#e91e8c","#7C5CBF","#92400E","#059669","#0284C7"];
 const GRADS=[["#2dc76d","#00c9a7"],["#7b5ea7","#e91e8c"],["#f97316","#fbbf24"],["#3b82f6","#06b6d4"],["#ef4444","#f97316"],["#14b8a6","#3b82f6"]];
+const MESES_NOMES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+let orcTipoAtual="unico",orcMesesSel=[];
 
 let UI={tab:"home",tipo:"gasto",catSel:"",mes:mesAtual()};
 let statExp=null; // {type:'cat'|'person', key:string}
-let DB_txs={},DB_wallets={},DB_cats={};
+let DB_txs={},DB_wallets={},DB_orcs={},DB_cats={};
 let CH={},meuNome=localStorage.getItem("sw_nome")||"Eu";
 let selEmoji="🏠",selColor=COLORS[0];
 function catsArr(){
@@ -328,6 +354,7 @@ function catsArr(){
   return [...list].sort((a,b)=>(a.ordem??9999)-(b.ordem??9999));
 }
 function getCat(id){return catsArr().find(c=>c.id===id||c._key===id)||{n:"Outros",ico:"💡",c:"#7C5CBF"}}
+function orcsArr(){return Object.entries(DB_orcs).map(([k,v])=>({...v,_key:k}))}
 function mesAtual(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
 function hoje(){return new Date().toISOString().split("T")[0]}
 function fmt(v){return"R$ "+Math.abs(+v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -344,6 +371,7 @@ function initFirebase(){
   const dot=document.getElementById("syncdot");
   onValue(ref(db,"wallets"),snap=>{DB_wallets=snap.val()||{};if(!Object.keys(DB_wallets).length)window._push(ref(db,"wallets"),{nome:"Carteira Conjunta",saldo:0,gi:0});render()});
   onValue(ref(db,"txs"),snap=>{DB_txs=snap.val()||{};dot.className="sync-dot ok";render()},()=>{dot.className="sync-dot err"});
+  onValue(ref(db,"orcs"),snap=>{DB_orcs=snap.val()||{};render()});
   onValue(ref(db,"cats"),snap=>{DB_cats=snap.val()||{};render()});
   document.getElementById("loader").style.display="none";
 }
@@ -356,13 +384,14 @@ function render(){
   const c=document.getElementById("content");
   if(UI.tab==="home") c.innerHTML=renderHome();
   else if(UI.tab==="txs") c.innerHTML=renderTxs();
+  else if(UI.tab==="budgets") c.innerHTML=renderBudgets();
   else if(UI.tab==="stats") c.innerHTML=renderStats();
   else if(UI.tab==="config") c.innerHTML=renderConfig();
   document.querySelectorAll(".ntab").forEach(b=>b.classList.toggle("on",b.dataset.tab===UI.tab));
-  ["home","txs","stats"].forEach(t=>{const b=document.getElementById("bn-"+t);if(b)b.classList.toggle("on",t===UI.tab)});
+  ["home","txs","budgets","stats"].forEach(t=>{const b=document.getElementById("bn-"+t);if(b)b.classList.toggle("on",t===UI.tab)});
   document.getElementById("tb-avatar").textContent=meuNome.slice(0,2).toUpperCase();
   if(!UI.catSel&&catsArr().length) UI.catSel=catsArr()[0]._key||catsArr()[0].id;
-  fillCatGrid();
+  fillCatGrid();fillOrcSel();
   requestAnimationFrame(()=>{if(UI.tab==="home")buildLine();if(UI.tab==="stats")buildPie()});
 }
 
@@ -394,6 +423,37 @@ function renderTxs(){
     h+=`<div class="txlist" style="margin-bottom:6px">`+items.map(t=>{const cat=getCat(t.tipo==="gasto"?t.cat:"outros");const w=walletsArr().find(x=>x._key===t.wid);
       return`<div class="txitem"><div class="txico" style="background:${cat.c}22">${cat.ico}</div><div class="txinfo"><div class="txname">${t.desc||""}</div><div class="txsub">${cat.n}${w?" · "+w.nome:""}${t.note?" · "+t.note:""}</div>${t.quem?`<span class="txwho">👤 ${t.quem}</span>`:""}</div><div style="text-align:right"><div class="txval" style="color:${t.tipo==="receita"?"#2dc76d":"#f0483e"}">${t.tipo==="receita"?"+":"-"}${fmt(t.v)}</div><div style="display:flex;gap:2px;justify-content:flex-end;margin-top:3px"><button class="delbtn" onclick="editTx('${t._key}')" style="color:var(--text2)">✏️</button><button class="delbtn" onclick="delTx('${t._key}')">🗑</button></div></div></div>`;
     }).join("")+`</div>`;
+  });
+  return h;
+}
+
+// ── BUDGETS ──
+function orcAplicavel(o,mesStr){
+  const m=+mesStr.split("-")[1];
+  if(o.tipo==="unico") return o.mes===mesStr;
+  if(o.tipo==="recorrente") return Array.isArray(o.meses)&&o.meses.includes(m);
+  return true; // orçamentos antigos sem vigência definida continuam valendo todo mês
+}
+function orcVigenciaLabel(o){
+  if(o.tipo==="unico") return `📅 Somente ${labelMes(o.mes)}`;
+  if(o.tipo==="recorrente") return `🔁 ${(o.meses||[]).slice().sort((a,b)=>a-b).map(m=>MESES_NOMES[m-1]).join(", ")}`;
+  return "🔁 Todos os meses";
+}
+function renderBudgets(){
+  const txs=txsMes();
+  let h=`<div class="sec"><span class="sec-title">Orçamentos · ${labelMes(UI.mes)}</span><button class="add-orc-btn" onclick="openOrcModal()">+ Novo</button></div>`;
+  const orcs=orcsArr().filter(o=>orcAplicavel(o,UI.mes));
+  if(!orcs.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido para este mês.<br>Toque em <strong>+ Novo</strong> para criar um limite por categoria.</div></div>`;
+  const[ano,mes]=UI.mes.split("-").map(Number),dim=new Date(ano,mes,0).getDate(),today=new Date(),dp=today.getFullYear()===ano&&today.getMonth()+1===mes?today.getDate():dim,dl=Math.max(0,dim-dp);
+  const withSpend=orcs.map(o=>{const items=txs.filter(t=>t.tipo==="gasto"&&t.cat===o.cat);const spent=items.reduce((s,t)=>s+(+t.v),0);return{o,items,spent,rawPct:spent/(+o.lim||1)*100}});
+  withSpend.sort((a,b)=>b.rawPct-a.rawPct); // quem está mais perto do limite aparece primeiro
+  withSpend.forEach(({o,items,spent,rawPct})=>{
+    const cat=getCat(o.cat),pct=Math.min(100,Math.round(rawPct)),left=Math.max(0,+o.lim-spent),daily=dl>0?(left/dl):0,bc=pct>90?"#f0483e":pct>65?"#fbbf24":"#2dc76d";
+    const isOpen=statExp&&statExp.type==="budget"&&statExp.key===o.cat;
+    let warn="";
+    if(rawPct>=100) warn=`<div style="font-size:10px;color:#f0483e;font-weight:700;margin-top:4px">⚠️ Orçamento estourado!</div>`;
+    else if(rawPct>=90) warn=`<div style="font-size:10px;color:#fbbf24;font-weight:700;margin-top:4px">⚠️ Quase no limite!</div>`;
+    h+=`<div class="bcard"><div class="bcard-row" style="cursor:pointer" onclick="toggleStatDetail('budget','${o.cat}')"><div class="bcard-left"><div class="bico" style="background:${cat.c}22">${cat.ico}</div><div><div class="bname">${cat.n}</div><div class="bsub">${fmt(spent)} de ${fmt(o.lim)}</div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-weight:600">${orcVigenciaLabel(o)}</div></div></div><div style="text-align:right;display:flex;align-items:center;gap:4px"><div class="bpct" style="color:${bc}">${pct}%</div><button class="delbtn" onclick="event.stopPropagation();openOrcModal('${o._key}')" style="color:var(--text2)">✏️</button><button class="delbtn" onclick="event.stopPropagation();delOrc('${o._key}')">🗑</button></div></div><div class="prog"><div class="prog-fill" style="width:${pct}%;background:${bc}"></div></div><div class="prog-days">Restam ${fmt(left)} · ${fmt(daily)}/dia · ${dl} dias</div>${warn}<div class="catstat-detail${isOpen?" open":""}">${isOpen?statDetailHtml(items):""}</div></div>`;
   });
   return h;
 }
@@ -600,6 +660,34 @@ function fillCatGrid(){
   if(!UI.catSel) UI.catSel=cats[0]?._key||cats[0]?.id||"";
   el.innerHTML=cats.map(c=>{const k=c._key||c.id;return`<button class="catbtn${UI.catSel===k?" on":""}" onclick="selCat('${k}')"><span class="catbtn-ico">${c.ico}</span>${c.n}</button>`}).join("");
 }
+function fillOrcSel(){const el=document.getElementById("o-cat");if(!el)return;el.innerHTML=catsArr().map(c=>`<option value="${c._key||c.id}">${c.ico} ${c.n}</option>`).join("")}
+function setOrcTipo(t){
+  orcTipoAtual=t;
+  document.getElementById("o-tipo-unico").className="ttbtn"+(t==="unico"?" on-r":"");
+  document.getElementById("o-tipo-rec").className="ttbtn"+(t==="recorrente"?" on-r":"");
+  const sec=document.getElementById("o-meses-sec");if(sec)sec.style.display=t==="recorrente"?"block":"none";
+}
+function fillMesesGrid(){
+  const el=document.getElementById("o-meses-grid");if(!el)return;
+  el.innerHTML=MESES_NOMES.map((n,i)=>{const m=i+1;return`<button class="catbtn${orcMesesSel.includes(m)?" on":""}" onclick="toggleOrcMes(${m})" style="padding:10px 3px"><span class="catbtn-ico" style="font-size:13px;font-weight:800">${n}</span></button>`}).join("");
+}
+function toggleOrcMes(m){
+  orcMesesSel=orcMesesSel.includes(m)?orcMesesSel.filter(x=>x!==m):[...orcMesesSel,m].sort((a,b)=>a-b);
+  fillMesesGrid();
+}
+function openOrcModal(key=""){
+  const o=key?orcsArr().find(x=>x._key===key):null;
+  document.getElementById("orc-modal-title").innerHTML=`${key?"Editar":"Novo"} Orçamento <button class="mclose" onclick="closeOv('orc')">✕</button>`;
+  document.getElementById("o-edit-key").value=key;
+  fillOrcSel();
+  document.getElementById("o-cat").value=o?.cat||(catsArr()[0]?._key||catsArr()[0]?.id||"");
+  document.getElementById("o-lim").value=o?.lim||"";
+  orcTipoAtual=o?.tipo||"unico";
+  orcMesesSel=o?.meses?[...o.meses]:[];
+  setOrcTipo(orcTipoAtual);
+  fillMesesGrid();
+  openOv("orc");
+}
 
 function openOv(id){
   document.getElementById("ov-"+id).classList.add("open");
@@ -623,6 +711,18 @@ function saveWallet(){
   const nome=document.getElementById("w-nome").value.trim(),saldo=parseFloat(document.getElementById("w-saldo").value)||0,gi=[...document.querySelectorAll(".wcolor")].findIndex(e=>e.classList.contains("on"));
   if(!nome){alert("Informe o nome.");return}
   window._push(window._ref(window._db,"wallets"),{nome,saldo,gi:gi>=0?gi:0});closeOv("wallet");document.getElementById("w-nome").value="";document.getElementById("w-saldo").value="";
+}
+function saveOrc(){
+  const cat=document.getElementById("o-cat").value,lim=parseFloat(document.getElementById("o-lim").value),key=document.getElementById("o-edit-key").value;
+  if(!lim||lim<=0){alert("Informe o limite.");return}
+  if(orcTipoAtual==="recorrente"&&!orcMesesSel.length){alert("Selecione ao menos um mês para repetir.");return}
+  const data={cat,lim,tipo:orcTipoAtual};
+  if(orcTipoAtual==="unico") data.mes=UI.mes; else data.meses=orcMesesSel;
+  const ex=orcsArr().find(o=>o.cat===cat&&o._key!==key);
+  if(ex) window._remove(window._ref(window._db,"orcs/"+ex._key));
+  if(key) window._set(window._ref(window._db,"orcs/"+key),data);
+  else window._push(window._ref(window._db,"orcs"),data);
+  closeOv("orc");document.getElementById("o-lim").value="";
 }
 function delTx(key){if(confirm("Remover esta transação?"))window._remove(window._ref(window._db,"txs/"+key))}
 
@@ -671,6 +771,7 @@ function updateTx(){
   window._set(window._ref(window._db,"txs/"+key),data);
   closeOv('edittx');
 }
+function delOrc(key){if(confirm("Remover orçamento?"))window._remove(window._ref(window._db,"orcs/"+key))}
 function goTab(t){UI.tab=t;render();document.getElementById("scroll").scrollTop=0}
 function moveMes(d){const[a,m]=UI.mes.split("-").map(Number),nd=new Date(a,m-1+d,1);UI.mes=nd.getFullYear()+"-"+String(nd.getMonth()+1).padStart(2,"0");render()}
 document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("open")}));
