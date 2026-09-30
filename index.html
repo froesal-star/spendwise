@@ -455,33 +455,38 @@ function sugestoesOrcamento(){
   return Object.entries(porCatPorMes).map(([cat,porMes])=>{
     const valores=Object.values(porMes); // só meses em que houve gasto nessa categoria
     const total=valores.reduce((s,v)=>s+v,0);
-    return{cat,media:total/valores.length,mesesComGasto:valores.length,janela:JANELA};
-  }).filter(x=>!jaOrcado.has(x.cat)&&x.media>0).sort((a,b)=>b.media-a.media);
+    return{cat,mediaIsolada:total/valores.length,mediaTotal:total/JANELA,mesesComGasto:valores.length,janela:JANELA};
+  }).filter(x=>!jaOrcado.has(x.cat)&&x.mediaIsolada>0).sort((a,b)=>b.mediaIsolada-a.mediaIsolada);
 }
 function renderBudgets(){
   const txs=txsMes();
   let h=`<div class="sec"><span class="sec-title">Orçamentos · ${labelMes(UI.mes)}</span><button class="add-orc-btn" onclick="openOrcModal()">+ Novo</button></div>`;
+  const orcs=orcsArr().filter(o=>orcAplicavel(o,UI.mes));
   const sugestoes=sugestoesOrcamento();
+  if(!orcs.length&&!sugestoes.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido para este mês.<br>Toque em <strong>+ Novo</strong> para criar um limite por categoria.</div></div>`;
+  if(orcs.length){
+    const[ano,mes]=UI.mes.split("-").map(Number),dim=new Date(ano,mes,0).getDate(),today=new Date(),dp=today.getFullYear()===ano&&today.getMonth()+1===mes?today.getDate():dim,dl=Math.max(0,dim-dp);
+    const withSpend=orcs.map(o=>{const items=txs.filter(t=>t.tipo==="gasto"&&t.cat===o.cat);const spent=items.reduce((s,t)=>s+(+t.v),0);return{o,items,spent,rawPct:spent/(+o.lim||1)*100}});
+    withSpend.sort((a,b)=>b.rawPct-a.rawPct); // quem está mais perto do limite aparece primeiro
+    withSpend.forEach(({o,items,spent,rawPct})=>{
+      const cat=getCat(o.cat),pct=Math.min(100,Math.round(rawPct)),left=Math.max(0,+o.lim-spent),daily=dl>0?(left/dl):0,bc=pct>90?"#f0483e":pct>65?"#fbbf24":"#2dc76d";
+      const isOpen=statExp&&statExp.type==="budget"&&statExp.key===o.cat;
+      let warn="";
+      if(rawPct>=100) warn=`<div style="font-size:10px;color:#f0483e;font-weight:700;margin-top:4px">⚠️ Orçamento estourado!</div>`;
+      else if(rawPct>=90) warn=`<div style="font-size:10px;color:#fbbf24;font-weight:700;margin-top:4px">⚠️ Quase no limite!</div>`;
+      h+=`<div class="bcard"><div class="bcard-row" style="cursor:pointer" onclick="toggleStatDetail('budget','${o.cat}')"><div class="bcard-left"><div class="bico" style="background:${cat.c}22">${cat.ico}</div><div><div class="bname">${cat.n}</div><div class="bsub">${fmt(spent)} de ${fmt(o.lim)}</div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-weight:600">${orcVigenciaLabel(o)}</div></div></div><div style="text-align:right;display:flex;align-items:center;gap:4px"><div class="bpct" style="color:${bc}">${pct}%</div><button class="delbtn" onclick="event.stopPropagation();openOrcModal('${o._key}')" style="color:var(--text2)">✏️</button><button class="delbtn" onclick="event.stopPropagation();delOrc('${o._key}')">🗑</button></div></div><div class="prog"><div class="prog-fill" style="width:${pct}%;background:${bc}"></div></div><div class="prog-days">Restam ${fmt(left)} · ${fmt(daily)}/dia · ${dl} dias</div>${warn}<div class="catstat-detail${isOpen?" open":""}">${isOpen?statDetailHtml(items):""}</div></div>`;
+    });
+  } else {
+    h+=`<div class="empty" style="padding:22px 16px"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido ainda para este mês.<br>Veja as sugestões abaixo 👇</div></div>`;
+  }
   if(sugestoes.length){
-    h+=`<div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-weight:600">💡 Sugestões com base na média de gastos dos últimos ${sugestoes[0].janela} meses (considerando apenas os meses em que houve gasto em cada categoria):</div>`;
-    h+=sugestoes.map(s=>{const cat=getCat(s.cat),sug=Math.ceil(s.media/10)*10;
-      return`<div class="bcard" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px"><div style="display:flex;align-items:center;gap:9px;min-width:0"><div class="bico" style="background:${cat.c}22;flex-shrink:0">${cat.ico}</div><div style="min-width:0"><div class="bname">${cat.n}</div><div class="bsub">Média: ${fmt(s.media)}/mês · ${s.mesesComGasto} de ${s.janela} meses</div></div></div><button class="add-orc-btn" style="flex-shrink:0" onclick="openOrcModal('','${s.cat}',${sug})">+ ${fmt(sug)}</button></div>`;
+    h+=`<div class="sec" style="margin-top:16px;margin-bottom:2px"><span class="sec-title" style="font-size:12px">💡 Sugestões · últimos ${sugestoes[0].janela} meses</span></div>`;
+    h+=`<div style="font-size:10px;color:var(--text3);margin-bottom:8px;font-weight:500">Duas formas de calcular: só os meses com gasto na categoria, ou dividido pelos ${sugestoes[0].janela} meses inteiros.</div>`;
+    h+=sugestoes.map(s=>{
+      const cat=getCat(s.cat),sugIsolada=Math.ceil(s.mediaIsolada/10)*10,sugTotal=Math.ceil(s.mediaTotal/10)*10;
+      return`<div class="bcard" style="padding:11px 14px"><div style="display:flex;align-items:center;gap:9px;margin-bottom:9px"><div class="bico" style="background:${cat.c}22;flex-shrink:0">${cat.ico}</div><div style="min-width:0"><div class="bname">${cat.n}</div><div class="bsub">${s.mesesComGasto} de ${s.janela} meses tiveram gasto</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div style="background:var(--bg3);border-radius:10px;padding:8px 9px"><div style="font-size:8.5px;color:var(--text3);font-weight:800;letter-spacing:.3px;margin-bottom:3px">SÓ MESES C/ GASTO</div><div style="font-size:13px;font-weight:900;margin-bottom:7px">${fmt(s.mediaIsolada)}</div><button class="add-orc-btn" style="width:100%;text-align:center" onclick="openOrcModal('','${s.cat}',${sugIsolada})">+ ${fmt(sugIsolada)}</button></div><div style="background:var(--bg3);border-radius:10px;padding:8px 9px"><div style="font-size:8.5px;color:var(--text3);font-weight:800;letter-spacing:.3px;margin-bottom:3px">DIVIDIDO POR ${s.janela}</div><div style="font-size:13px;font-weight:900;margin-bottom:7px">${fmt(s.mediaTotal)}</div><button class="add-orc-btn" style="width:100%;text-align:center" onclick="openOrcModal('','${s.cat}',${sugTotal})">+ ${fmt(sugTotal)}</button></div></div></div>`;
     }).join("");
   }
-  const orcs=orcsArr().filter(o=>orcAplicavel(o,UI.mes));
-  if(!orcs.length) return h+`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">Nenhum orçamento definido para este mês.<br>Toque em <strong>+ Novo</strong> ou use uma sugestão acima.</div></div>`;
-  if(sugestoes.length) h+=`<div class="sec" style="margin-top:14px;margin-bottom:6px"><span class="sec-title" style="font-size:12px">Seus orçamentos</span></div>`;
-  const[ano,mes]=UI.mes.split("-").map(Number),dim=new Date(ano,mes,0).getDate(),today=new Date(),dp=today.getFullYear()===ano&&today.getMonth()+1===mes?today.getDate():dim,dl=Math.max(0,dim-dp);
-  const withSpend=orcs.map(o=>{const items=txs.filter(t=>t.tipo==="gasto"&&t.cat===o.cat);const spent=items.reduce((s,t)=>s+(+t.v),0);return{o,items,spent,rawPct:spent/(+o.lim||1)*100}});
-  withSpend.sort((a,b)=>b.rawPct-a.rawPct); // quem está mais perto do limite aparece primeiro
-  withSpend.forEach(({o,items,spent,rawPct})=>{
-    const cat=getCat(o.cat),pct=Math.min(100,Math.round(rawPct)),left=Math.max(0,+o.lim-spent),daily=dl>0?(left/dl):0,bc=pct>90?"#f0483e":pct>65?"#fbbf24":"#2dc76d";
-    const isOpen=statExp&&statExp.type==="budget"&&statExp.key===o.cat;
-    let warn="";
-    if(rawPct>=100) warn=`<div style="font-size:10px;color:#f0483e;font-weight:700;margin-top:4px">⚠️ Orçamento estourado!</div>`;
-    else if(rawPct>=90) warn=`<div style="font-size:10px;color:#fbbf24;font-weight:700;margin-top:4px">⚠️ Quase no limite!</div>`;
-    h+=`<div class="bcard"><div class="bcard-row" style="cursor:pointer" onclick="toggleStatDetail('budget','${o.cat}')"><div class="bcard-left"><div class="bico" style="background:${cat.c}22">${cat.ico}</div><div><div class="bname">${cat.n}</div><div class="bsub">${fmt(spent)} de ${fmt(o.lim)}</div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-weight:600">${orcVigenciaLabel(o)}</div></div></div><div style="text-align:right;display:flex;align-items:center;gap:4px"><div class="bpct" style="color:${bc}">${pct}%</div><button class="delbtn" onclick="event.stopPropagation();openOrcModal('${o._key}')" style="color:var(--text2)">✏️</button><button class="delbtn" onclick="event.stopPropagation();delOrc('${o._key}')">🗑</button></div></div><div class="prog"><div class="prog-fill" style="width:${pct}%;background:${bc}"></div></div><div class="prog-days">Restam ${fmt(left)} · ${fmt(daily)}/dia · ${dl} dias</div>${warn}<div class="catstat-detail${isOpen?" open":""}">${isOpen?statDetailHtml(items):""}</div></div>`;
-  });
   return h;
 }
 
